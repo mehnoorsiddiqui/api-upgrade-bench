@@ -1,0 +1,12 @@
+# yaml-language-server: $schema=../../schemas/api.schema.json
+name: petstore
+# From `apimatic publishing profile list` once the "bench-petstore" profile exists (README, one-time setup).
+profile_id: null
+nuget_package_id: ApimaticBench.Petstore
+sdk_repo: mehnoorsiddiqui/bench-petstore-sdk-csharp
+plugin_repo: mehnoorsiddiqui/bench-petstore-context-plugin
+plugin_id: bench-petstore
+plugin_name: Bench Petstore
+# Paths (globs, relative to the SDK root) the generator-drift check ignores. Tune after the spike
+# if source publishing adds files that `sdk publish --dry-run` does not produce.
+drift_ignore: []

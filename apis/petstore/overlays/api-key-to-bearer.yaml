@@ -1,0 +1,30 @@
+overlay: 1.0.0
+info:
+  title: Replace the api_key header scheme with HTTP bearer auth
+  version: 1.0.0
+x-change:
+  type: auth-scheme-change
+  breaking: true
+  targets:
+    - security:api_key
+    - operation:GET /pet/{petId}
+    - operation:GET /store/inventory
+actions:
+  - target: $.components.securitySchemes.api_key
+    remove: true
+  - target: $.components.securitySchemes
+    update:
+      bearer_auth:
+        type: http
+        scheme: bearer
+  - target: $.paths['/pet/{petId}'].get.security[?(@.api_key)]
+    remove: true
+  - target: $.paths['/pet/{petId}'].get.security
+    update:
+      - bearer_auth: []
+  - target: $.paths['/store/inventory'].get.security
+    remove: true
+  - target: $.paths['/store/inventory'].get
+    update:
+      security:
+        - bearer_auth: []

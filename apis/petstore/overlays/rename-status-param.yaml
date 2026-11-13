@@ -1,0 +1,13 @@
+overlay: 1.0.0
+info:
+  title: Rename the findPetsByStatus 'status' query parameter to 'petStatus'
+  version: 1.0.0
+x-change:
+  type: rename-parameter
+  breaking: true
+  targets:
+    - parameter:GET /pet/findByStatus?status
+actions:
+  - target: $.paths['/pet/findByStatus'].get.parameters[?(@.name == 'status')]
+    update:
+      name: petStatus

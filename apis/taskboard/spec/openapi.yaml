@@ -1,0 +1,264 @@
+openapi: 3.0.3
+info:
+  title: Taskboard API
+  description: |-
+    An invented project/task tracker used only by api-upgrade-bench. It exists to show that adding
+    an API to the bench is adding a folder; it is not a real service.
+  version: 1.0.0
+servers:
+  - url: https://api.taskboard.example.com/v1
+security:
+  - api_key: []
+tags:
+  - name: projects
+  - name: tasks
+paths:
+  /projects:
+    get:
+      tags: [projects]
+      summary: List projects.
+      operationId: listProjects
+      parameters:
+        - name: limit
+          in: query
+          required: false
+          schema:
+            type: integer
+            format: int32
+            minimum: 1
+            maximum: 100
+            default: 20
+        - name: cursor
+          in: query
+          required: false
+          schema:
+            type: string
+      responses:
+        '200':
+          description: A page of projects.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProjectPage'
+        default:
+          $ref: '#/components/responses/Error'
+    post:
+      tags: [projects]
+      summary: Create a project.
+      operationId: createProject
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ProjectInput'
+      responses:
+        '201':
+          description: The created project.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Project'
+        default:
+          $ref: '#/components/responses/Error'
+  /projects/{projectId}:
+    get:
+      tags: [projects]
+      summary: Get a project.
+      operationId: getProject
+      parameters:
+        - $ref: '#/components/parameters/ProjectId'
+      responses:
+        '200':
+          description: The project.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Project'
+        default:
+          $ref: '#/components/responses/Error'
+  /projects/{projectId}/tasks:
+    get:
+      tags: [tasks]
+      summary: List a project's tasks.
+      operationId: listTasks
+      parameters:
+        - $ref: '#/components/parameters/ProjectId'
+        - name: status
+          in: query
+          required: false
+          schema:
+            $ref: '#/components/schemas/TaskStatus'
+        - name: assignee
+          in: query
+          required: false
+          schema:
+            type: string
+      responses:
+        '200':
+          description: The project's tasks.
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Task'
+        default:
+          $ref: '#/components/responses/Error'
+    post:
+      tags: [tasks]
+      summary: Create a task in a project.
+      operationId: createTask
+      parameters:
+        - $ref: '#/components/parameters/ProjectId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/TaskInput'
+      responses:
+        '201':
+          description: The created task.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Task'
+        default:
+          $ref: '#/components/responses/Error'
+  /tasks/{taskId}:
+    get:
+      tags: [tasks]
+      summary: Get a task.
+      operationId: getTask
+      parameters:
+        - $ref: '#/components/parameters/TaskId'
+      responses:
+        '200':
+          description: The task.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Task'
+        default:
+          $ref: '#/components/responses/Error'
+    delete:
+      tags: [tasks]
+      summary: Delete a task.
+      operationId: deleteTask
+      parameters:
+        - $ref: '#/components/parameters/TaskId'
+      responses:
+        '204':
+          description: Deleted.
+        default:
+          $ref: '#/components/responses/Error'
+components:
+  securitySchemes:
+    api_key:
+      type: apiKey
+      in: header
+      name: X-Api-Key
+  parameters:
+    ProjectId:
+      name: projectId
+      in: path
+      required: true
+      schema:
+        type: string
+    TaskId:
+      name: taskId
+      in: path
+      required: true
+      schema:
+        type: string
+  responses:
+    Error:
+      description: An error.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+  schemas:
+    Project:
+      type: object
+      required: [id, name, createdAt]
+      properties:
+        id:
+          type: string
+          example: prj_123
+        name:
+          type: string
+          example: Website relaunch
+        description:
+          type: string
+        createdAt:
+          type: string
+          format: date-time
+    ProjectInput:
+      type: object
+      required: [name]
+      properties:
+        name:
+          type: string
+        description:
+          type: string
+    ProjectPage:
+      type: object
+      required: [items]
+      properties:
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/Project'
+        nextCursor:
+          type: string
+    TaskStatus:
+      type: string
+      enum: [todo, in_progress, done]
+    Task:
+      type: object
+      required: [id, projectId, title, status]
+      properties:
+        id:
+          type: string
+          example: tsk_456
+        projectId:
+          type: string
+        title:
+          type: string
+          example: Write release notes
+        status:
+          $ref: '#/components/schemas/TaskStatus'
+        assignee:
+          type: string
+        dueDate:
+          type: string
+          format: date
+        estimateHours:
+          type: number
+          format: double
+    TaskInput:
+      type: object
+      required: [title]
+      properties:
+        title:
+          type: string
+        status:
+          $ref: '#/components/schemas/TaskStatus'
+        assignee:
+          type: string
+        dueDate:
+          type: string
+          format: date
+        estimateHours:
+          type: number
+          format: double
+    Error:
+      type: object
+      required: [code, message]
+      properties:
+        code:
+          type: string
+        message:
+          type: string

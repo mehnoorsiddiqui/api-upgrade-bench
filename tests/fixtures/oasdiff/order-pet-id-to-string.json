@@ -1,0 +1,44 @@
+[
+  {
+    "id": "request-property-type-changed",
+    "level": 3,
+    "operation": "POST",
+    "path": "/store/order",
+    "text": "the `petId` request property `type/format` changed from `integer/int64` to `string` (media type: application/json)"
+  },
+  {
+    "id": "response-property-type-changed",
+    "level": 3,
+    "operation": "POST",
+    "path": "/store/order",
+    "text": "the `petId` response's property `type/format` changed from `integer/int64` to `string` for status `200`"
+  },
+  {
+    "id": "response-property-type-changed",
+    "level": 3,
+    "operation": "GET",
+    "path": "/store/order/{orderId}",
+    "text": "the `petId` response's property `type/format` changed from `integer/int64` to `string` for status `200` (media type: application/json)"
+  },
+  {
+    "id": "response-property-type-changed",
+    "level": 3,
+    "operation": "GET",
+    "path": "/store/order/{orderId}",
+    "text": "the `petId` response's property `type/format` changed from `integer/int64` to `string` for status `200` (media type: application/xml)"
+  },
+  {
+    "id": "request-property-type-compatible",
+    "level": 1,
+    "operation": "POST",
+    "path": "/store/order",
+    "text": "the `petId` request property `type/format` changed from `integer/int64` to `string` (backward compatible) (media type: application/x-www-form-urlencoded)"
+  },
+  {
+    "id": "request-property-type-compatible",
+    "level": 1,
+    "operation": "POST",
+    "path": "/store/order",
+    "text": "the `petId` request property `type/format` changed from `integer/int64` to `string` (backward compatible) (media type: application/xml)"
+  }
+]

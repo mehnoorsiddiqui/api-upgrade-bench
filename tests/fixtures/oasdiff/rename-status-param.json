@@ -1,0 +1,16 @@
+[
+  {
+    "id": "request-parameter-removed",
+    "level": 2,
+    "operation": "GET",
+    "path": "/pet/findByStatus",
+    "text": "deleted the `query` request parameter `status`"
+  },
+  {
+    "id": "new-optional-request-parameter",
+    "level": 1,
+    "operation": "GET",
+    "path": "/pet/findByStatus",
+    "text": "added the new optional `query` request parameter `petStatus`"
+  }
+]

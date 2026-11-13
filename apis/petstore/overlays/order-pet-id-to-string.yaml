@@ -1,0 +1,17 @@
+overlay: 1.0.0
+info:
+  title: Order.petId changes from int64 to string
+  version: 1.0.0
+x-change:
+  type: change-property-type
+  breaking: true
+  targets:
+    - schema:Order.petId
+actions:
+  - target: $.components.schemas.Order.properties.petId
+    remove: true
+  - target: $.components.schemas.Order.properties
+    update:
+      petId:
+        type: string
+        example: '198772'

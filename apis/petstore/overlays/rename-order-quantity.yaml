@@ -1,0 +1,18 @@
+overlay: 1.0.0
+info:
+  title: Rename Order.quantity to Order.itemCount
+  version: 1.0.0
+x-change:
+  type: rename-model-property
+  breaking: true
+  targets:
+    - schema:Order.quantity
+actions:
+  - target: $.components.schemas.Order.properties.quantity
+    remove: true
+  - target: $.components.schemas.Order.properties
+    update:
+      itemCount:
+        type: integer
+        format: int32
+        example: 7

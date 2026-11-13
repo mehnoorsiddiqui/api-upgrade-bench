@@ -1,0 +1,103 @@
+name: release
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "apis/**"
+      - "catalog/**"
+  workflow_dispatch:
+    inputs:
+      api:
+        description: "API folder under apis/ (empty: every API with pending releases)"
+        required: false
+        type: string
+      version:
+        description: "Release only this version (empty: every pending version of the API)"
+        required: false
+        type: string
+      allow_drift:
+        description: "Publish even if the generator no longer reproduces the published base SDK"
+        required: false
+        type: boolean
+        default: false
+
+permissions:
+  contents: write # commit releases.lock.yaml back to this repo
+
+env:
+  OASDIFF_VERSION: "1.35.0"
+  OASDIFF_SHA256: a8023002fcb2eaa7f5758148a9303cb63d33b939886df312268bc0fc7b939140
+  APIMATIC_CLI_VERSION: "2.2.0"
+
+jobs:
+  plan:
+    runs-on: ubuntu-latest
+    outputs:
+      apis: ${{ steps.apis.outputs.apis }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: main
+      - uses: ./.github/actions/setup-bench
+      - name: APIs with releases missing from their lock
+        id: apis
+        env:
+          INPUT_API: ${{ inputs.api }}
+        run: |
+          if [ -n "$INPUT_API" ]; then
+            uv run bench validate "$INPUT_API"
+            echo "apis=[\"$INPUT_API\"]" >> "$GITHUB_OUTPUT"
+          else
+            uv run bench pending --publishable
+            echo "apis=$(uv run bench pending --publishable --apis-json)" >> "$GITHUB_OUTPUT"
+          fi
+
+  release:
+    needs: plan
+    if: needs.plan.outputs.apis != '[]'
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+    strategy:
+      fail-fast: false
+      matrix:
+        api: ${{ fromJSON(needs.plan.outputs.apis) }}
+    # One release run per API at a time: versions publish serially and share the SDK/plugin repos.
+    concurrency:
+      group: release-${{ matrix.api }}
+      cancel-in-progress: false
+    name: release ${{ matrix.api }}
+    steps:
+      # Latest main, not the triggering commit: a run that waited on the concurrency group must
+      # see the lock entries the previous run committed.
+      - uses: actions/checkout@v4
+        with:
+          ref: main
+          fetch-depth: 0
+      - uses: ./.github/actions/setup-bench
+        with:
+          apimatic: "true"
+
+      - name: Release ${{ matrix.api }}
+        env:
+          APIMATIC_API_KEY: ${{ secrets.APIMATIC_API_KEY }}
+          # contents:write on bench-*-context-plugin (push + tag) and bench-*-sdk-csharp (tag fallback)
+          PLUGIN_PUSH_TOKEN: ${{ secrets.PLUGIN_PUSH_TOKEN }}
+          GH_TOKEN: ${{ secrets.PLUGIN_PUSH_TOKEN }}
+          INPUT_VERSION: ${{ inputs.version }}
+          INPUT_ALLOW_DRIFT: ${{ inputs.allow_drift }}
+        run: |
+          args=("${{ matrix.api }}" --commit-lock)
+          if [ -n "$INPUT_VERSION" ]; then args+=(--version "$INPUT_VERSION"); fi
+          if [ "$INPUT_ALLOW_DRIFT" = "true" ]; then args+=(--allow-drift); fi
+          uv run bench release "${args[@]}"
+
+      - if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: release-${{ matrix.api }}-${{ github.run_attempt }}
+          # the CLI projects (spec, apimatic.json with the publishing record) and generated plugins
+          path: |
+            build/${{ matrix.api }}/*/src
+            build/${{ matrix.api }}/*/plugin
+          if-no-files-found: ignore

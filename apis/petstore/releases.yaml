@@ -1,0 +1,9 @@
+# yaml-language-server: $schema=../../schemas/releases.schema.json
+# Every version = the base spec + its own overlays (star topology: versions do not build on each
+# other). Add a release by appending an entry; a version is never edited or removed once it is in
+# releases.lock.yaml. A release with a breaking overlay needs a new major.
+base: 1.0.0
+releases: []
+# Next, once 1.0.0 is published:
+#   - version: 2.0.0
+#     overlays: [rename-get-pet]

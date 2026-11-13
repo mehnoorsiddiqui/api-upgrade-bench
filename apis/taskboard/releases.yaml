@@ -1,0 +1,3 @@
+# yaml-language-server: $schema=../../schemas/releases.schema.json
+base: 1.0.0
+releases: []

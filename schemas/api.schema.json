@@ -1,0 +1,29 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "apis/<api>/api.yaml",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["name", "profile_id", "nuget_package_id", "sdk_repo", "plugin_repo", "plugin_id", "plugin_name"],
+  "properties": {
+    "name": { "type": "string", "pattern": "^[a-z0-9]+(-[a-z0-9]+)*$" },
+    "profile_id": {
+      "description": "APIMatic publishing profile id (`apimatic publishing profile list`). null until the profile exists; releases refuse to run without it.",
+      "oneOf": [{ "type": "string", "pattern": "^[0-9a-f]{24}$" }, { "type": "null" }]
+    },
+    "nuget_package_id": { "type": "string", "pattern": "^[A-Za-z0-9_]+([.][A-Za-z0-9_]+)*$" },
+    "sdk_repo": { "$ref": "#/$defs/repo" },
+    "sdk_branch": { "type": "string", "minLength": 1 },
+    "plugin_repo": { "$ref": "#/$defs/repo" },
+    "plugin_branch": { "type": "string", "minLength": 1 },
+    "plugin_id": { "type": "string", "pattern": "^[a-z0-9]+(-[a-z0-9]+)*$" },
+    "plugin_name": { "type": "string", "pattern": "[A-Za-z0-9]" },
+    "drift_ignore": {
+      "description": "Globs (relative to the SDK root) left out of the generator-drift comparison.",
+      "type": "array",
+      "items": { "type": "string", "minLength": 1 }
+    }
+  },
+  "$defs": {
+    "repo": { "type": "string", "pattern": "^[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+$" }
+  }
+}

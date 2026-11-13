@@ -1,0 +1,101 @@
+# Change types a benchmark release can contain. Every overlay names exactly one of these in
+# `x-change.type`, and `bench diffcheck` holds the spec diff (oasdiff `changelog`, all levels)
+# to what the declared types say it should contain.
+#
+#   breaking   whether code written against the previous SDK stops compiling or behaving the
+#              same. This is the SDK view, not oasdiff's: oasdiff rates an operationId change as
+#              INFO, but it renames the generated SDK method. `breaking: true` forces a new major.
+#   oasdiff.required  every entry must be detected; an entry that is a list is satisfied by any
+#                     one of its ids (the same change surfaces differently depending on whether
+#                     the property is used in requests, responses, or both).
+#   oasdiff.allowed   further ids this type may produce. Anything detected that no declared type
+#                     requires or allows is an unlabelled change and fails the release.
+#
+# Check ids are oasdiff's (`oasdiff checks changelog`); tests verify they exist in the pinned
+# oasdiff version.
+
+# Never attributed to a change type: they compare info.version, which the build sets, rather
+# than anything an overlay changes.
+ignored_checks:
+  - api-version-not-bumped
+  - api-version-decreased
+
+change_types:
+  - id: rename-operation
+    category: operation
+    breaking: true
+    description: An operation's operationId changes, so the SDK method is renamed. Path and verb stay.
+    oasdiff:
+      required:
+        - api-operation-id-removed
+      allowed:
+        - api-operation-id-added
+
+  - id: rename-parameter
+    category: parameter
+    breaking: true
+    description: A path, query or header parameter is renamed (same location, same schema).
+    oasdiff:
+      required:
+        - [request-parameter-removed, request-parameter-removed-with-deprecation]
+        - [new-optional-request-parameter, new-required-request-parameter]
+      allowed: []
+
+  - id: add-required-parameter
+    category: parameter
+    breaking: true
+    description: An operation gains a new required parameter the caller must now supply.
+    oasdiff:
+      required:
+        - [new-required-request-parameter, new-required-request-default-parameter-to-existing-path]
+      allowed: []
+
+  - id: rename-model-property
+    category: model
+    breaking: true
+    description: A schema property is renamed (same type), so the SDK model property is renamed.
+    oasdiff:
+      required:
+        - [request-property-removed, response-optional-property-removed, response-required-property-removed]
+        - [new-optional-request-property, new-required-request-property, response-optional-property-added, response-required-property-added]
+      allowed:
+        - request-property-removed
+        - response-optional-property-removed
+        - response-required-property-removed
+        - new-optional-request-property
+        - new-required-request-property
+        - response-optional-property-added
+        - response-required-property-added
+
+  - id: change-property-type
+    category: model
+    breaking: true
+    description: A schema property keeps its name but changes type (e.g. int64 -> string).
+    oasdiff:
+      required:
+        - [request-property-type-changed, response-property-type-changed]
+      allowed:
+        - request-property-type-changed
+        - response-property-type-changed
+        - request-property-type-compatible
+        - response-property-type-compatible
+        - request-property-type-generalized
+        - response-property-type-generalized
+        - response-property-type-specialized
+
+  - id: auth-scheme-change
+    category: auth
+    breaking: true
+    description: The security scheme an operation needs is replaced (e.g. API key header -> bearer token).
+    oasdiff:
+      required:
+        - [api-security-removed, api-global-security-removed, api-security-component-type-changed]
+        - [api-security-added, api-global-security-added, api-security-component-type-changed]
+      allowed:
+        - api-security-removed
+        - api-security-added
+        - api-global-security-removed
+        - api-global-security-added
+        - api-security-component-added
+        - api-security-component-removed
+        - api-security-component-type-changed

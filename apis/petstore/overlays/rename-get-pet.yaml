@@ -1,0 +1,13 @@
+overlay: 1.0.0
+info:
+  title: Rename getPetById to getPet
+  version: 1.0.0
+x-change:
+  type: rename-operation
+  breaking: true
+  targets:
+    - operation:GET /pet/{petId}
+actions:
+  - target: $.paths['/pet/{petId}'].get
+    update:
+      operationId: getPet

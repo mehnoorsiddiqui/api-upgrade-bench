@@ -1,0 +1,40 @@
+[
+  {
+    "id": "api-security-removed",
+    "level": 3,
+    "operation": "GET",
+    "path": "/pet/{petId}",
+    "text": "the endpoint scheme security `api_key` was removed from the API"
+  },
+  {
+    "id": "api-security-removed",
+    "level": 3,
+    "operation": "GET",
+    "path": "/store/inventory",
+    "text": "the endpoint scheme security `api_key` was removed from the API"
+  },
+  {
+    "id": "api-security-component-added",
+    "level": 1,
+    "text": "the component security scheme `bearer_auth` was added"
+  },
+  {
+    "id": "api-security-component-removed",
+    "level": 1,
+    "text": "the component security scheme `api_key` was removed"
+  },
+  {
+    "id": "api-security-added",
+    "level": 1,
+    "operation": "GET",
+    "path": "/pet/{petId}",
+    "text": "the endpoint scheme security `bearer_auth` was added to the API"
+  },
+  {
+    "id": "api-security-added",
+    "level": 1,
+    "operation": "GET",
+    "path": "/store/inventory",
+    "text": "the endpoint scheme security `bearer_auth` was added to the API"
+  }
+]

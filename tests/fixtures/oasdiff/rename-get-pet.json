@@ -1,0 +1,9 @@
+[
+  {
+    "id": "api-operation-id-removed",
+    "level": 1,
+    "operation": "GET",
+    "path": "/pet/{petId}",
+    "text": "api operation id `getPetById` removed and replaced with `getPet`"
+  }
+]

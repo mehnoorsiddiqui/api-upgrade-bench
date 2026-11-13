@@ -1,0 +1,45 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "apis/<api>/overlays/<change-id>.yaml (OpenAPI Overlay 1.0 + x-change)",
+  "type": "object",
+  "required": ["overlay", "info", "actions", "x-change"],
+  "properties": {
+    "overlay": { "type": "string", "pattern": "^1[.]0[.][0-9]+$" },
+    "info": {
+      "type": "object",
+      "required": ["title", "version"],
+      "properties": { "title": { "type": "string", "minLength": 1 }, "version": { "type": "string", "minLength": 1 } }
+    },
+    "extends": { "type": "string" },
+    "x-change": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["type", "breaking", "targets"],
+      "properties": {
+        "type": { "type": "string", "pattern": "^[a-z0-9]+(-[a-z0-9]+)*$" },
+        "breaking": { "type": "boolean" },
+        "targets": { "type": "array", "minItems": 1, "items": { "type": "string", "minLength": 1 } }
+      }
+    },
+    "actions": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "required": ["target"],
+        "properties": {
+          "target": { "type": "string", "pattern": "^[$]" },
+          "description": { "type": "string" },
+          "update": {},
+          "remove": { "type": "boolean" }
+        },
+        "oneOf": [
+          { "required": ["update"], "not": { "required": ["remove"] } },
+          { "required": ["remove"], "not": { "required": ["update"] }, "properties": { "remove": { "const": true } } }
+        ]
+      }
+    }
+  },
+  "patternProperties": { "^x-": {} },
+  "additionalProperties": false
+}

@@ -1,0 +1,74 @@
+name: validate
+
+on:
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+env:
+  # Pinned tools. The lock records the APIMatic CLI version each release was made with.
+  OASDIFF_VERSION: "1.35.0"
+  OASDIFF_SHA256: a8023002fcb2eaa7f5758148a9303cb63d33b939886df312268bc0fc7b939140
+  APIMATIC_CLI_VERSION: "2.2.0"
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    outputs:
+      matrix: ${{ steps.pending.outputs.matrix }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: ./.github/actions/setup-bench
+
+      - name: Unit tests
+        run: uv run pytest -q
+
+      - name: Schema + release rules (catalog, overlays, releases, lock)
+        run: uv run bench validate
+
+      - name: Every overlay alone produces exactly its declared change type
+        run: uv run bench diffcheck-overlays
+
+      - name: New releases (declared, not in the lock)
+        id: pending
+        run: |
+          uv run bench pending
+          echo "matrix=$(uv run bench pending --github-matrix)" >> "$GITHUB_OUTPUT"
+
+  check-release:
+    needs: test
+    if: fromJSON(needs.test.outputs.matrix).include[0] != null
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix: ${{ fromJSON(needs.test.outputs.matrix) }}
+    name: check ${{ matrix.api }} ${{ matrix.version }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: ./.github/actions/setup-bench
+        with:
+          apimatic: "true"
+          dotnet: "true"
+
+      # build + diffcheck + `apimatic api validate` + `apimatic sdk generate` + `dotnet build`.
+      # Nothing is published. Without the secret (PRs from forks) only build + diffcheck run.
+      - name: Check ${{ matrix.api }} ${{ matrix.version }}
+        env:
+          APIMATIC_API_KEY: ${{ secrets.APIMATIC_API_KEY }}
+        run: |
+          if [ -n "$APIMATIC_API_KEY" ]; then
+            uv run bench check "${{ matrix.api }}" "${{ matrix.version }}"
+          else
+            echo "::warning::APIMATIC_API_KEY is not available; running build + diffcheck only"
+            uv run bench check "${{ matrix.api }}" "${{ matrix.version }}" --offline
+          fi
+
+      - if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: check-${{ matrix.api }}-${{ matrix.version }}
+          path: |
+            build/${{ matrix.api }}/${{ matrix.version }}/src
+          if-no-files-found: ignore

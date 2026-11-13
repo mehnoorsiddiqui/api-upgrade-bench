@@ -1,0 +1,51 @@
+name: Set up bench
+description: Python + uv + the bench package, the pinned oasdiff, and optionally Node/APIMatic CLI and .NET.
+
+inputs:
+  apimatic:
+    description: Install Node 24 and the APIMatic CLI.
+    default: "false"
+  dotnet:
+    description: Install the .NET SDK (the generated C# SDK uses C# 14, so .NET 10).
+    default: "false"
+
+runs:
+  using: composite
+  steps:
+    - uses: astral-sh/setup-uv@v6
+      with:
+        python-version: "3.11"
+        enable-cache: true
+
+    - name: Install bench
+      shell: bash
+      run: uv sync --locked
+
+    - name: Install oasdiff ${{ env.OASDIFF_VERSION }}
+      shell: bash
+      run: |
+        set -euo pipefail
+        archive="oasdiff_${OASDIFF_VERSION}_linux_amd64.tar.gz"
+        curl -fsSL -o "/tmp/$archive" "https://github.com/oasdiff/oasdiff/releases/download/v${OASDIFF_VERSION}/$archive"
+        echo "${OASDIFF_SHA256}  /tmp/$archive" | sha256sum --check --strict
+        mkdir -p "$HOME/.local/bin"
+        tar -xzf "/tmp/$archive" -C "$HOME/.local/bin" oasdiff
+        echo "$HOME/.local/bin" >> "$GITHUB_PATH"
+        "$HOME/.local/bin/oasdiff" --version
+
+    - if: inputs.apimatic == 'true'
+      uses: actions/setup-node@v4
+      with:
+        node-version: "24"
+
+    - if: inputs.apimatic == 'true'
+      name: Install APIMatic CLI ${{ env.APIMATIC_CLI_VERSION }}
+      shell: bash
+      run: |
+        npm install -g "@apimatic/cli@${APIMATIC_CLI_VERSION}"
+        apimatic --version
+
+    - if: inputs.dotnet == 'true'
+      uses: actions/setup-dotnet@v4
+      with:
+        dotnet-version: "10.0.x"
