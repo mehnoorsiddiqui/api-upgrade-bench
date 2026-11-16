@@ -7,7 +7,7 @@ name: petstore
 #
 # From `apimatic publishing profile list`: the profile that publishes SwaggerPetstoreOpenApi310
 # to NuGet and the source to petstore-sdk-csharp.
-profile_id: null
+profile_id: 6aeb0cb7f53c2964c9e0cd24
 nuget_package_id: SwaggerPetstoreOpenApi310
 sdk_repo: mehnoorsiddiqui/petstore-sdk-csharp
 plugin_repo: mehnoorsiddiqui/petstore-context-plugin
