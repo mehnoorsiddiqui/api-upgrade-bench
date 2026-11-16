@@ -2,10 +2,7 @@
 # Every version = the base spec + its own overlays (star topology: versions do not build on each
 # other). Add a release by appending an entry; a version is never edited or removed once it is in
 # releases.lock.yaml. A release with a breaking overlay needs a new major.
-#
-# The base is 1.0.1: the existing SwaggerPetstoreOpenApi310 release the integration app pins.
-# It (and the hand-made 1.0.2) are already published, so the lock adopts them instead of publishing.
-base: 1.0.1
+base: 1.0.0
 releases:
   - version: 2.0.0
     overlays: [rename-status-param]   # GET /pet/findByStatus: query param `status` -> `petStatus`
