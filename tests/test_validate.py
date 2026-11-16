@@ -156,3 +156,26 @@ def test_base_spec_edit_after_release_is_caught(mini_repo):
     spec["info"]["title"] = "Changed"
     write_yaml(path, spec)
     assert any("1.0.0: rebuilding gives spec sha256" in e for e in errors(mini_repo))
+
+
+def test_codegen_settings_in_metadata_are_flagged(mini_repo):
+    meta = mini_repo.root / "apis" / "mini" / "spec" / "APIMATIC-META.json"
+    meta.write_text('{"CodeGenSettings": {"ProjectName": "X"}}\n', encoding="utf-8")
+    problems = validate_all(Bench(mini_repo.root))
+    assert problems.ok and any("ignored by Codegen v4" in w for w in problems.warnings)
+
+
+def test_adopted_versions_are_not_rebuilt_or_republished(mini_repo):
+    from bench.lock import pending_versions
+
+    api = mini_repo.api("mini")
+    entries = {
+        "1.0.0": {"adopted": True, "spec_sha256": None, "overlays": []},
+        "1.0.5": {"adopted": True, "spec_sha256": None, "overlays": []},  # published outside the bench, undeclared
+    }
+    save_lock(api, entries)
+    assert errors(mini_repo) == []
+    assert pending_versions(mini_repo.releases(api), load_lock(api)) == ["2.0.0"]
+
+    releases(mini_repo, {"base": "1.0.0", "releases": [{"version": "1.0.5", "overlays": ["rename-param"]}]})
+    assert any("adopted" in e for e in errors(mini_repo))

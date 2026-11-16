@@ -1,0 +1,42 @@
+# Written by CI (`bench release`). Do not edit by hand.
+# One entry per published version: what it contains and where it was published.
+#
+# The two `adopted` entries were published before the bench took over this package (by the SDK
+# repo's own NuGet workflow); they are here so the bench never publishes these versions again.
+releases:
+  1.0.1:
+    adopted: true
+    note: Existing release; the integration app pins it. Base of the bench's star topology.
+    overlays: []
+    spec_sha256: null
+    change_types: []
+    sdk:
+      package_id: SwaggerPetstoreOpenApi310
+      version: 1.0.1
+      repo: mehnoorsiddiqui/petstore-sdk-csharp
+      tag: v1.0.1
+      commit: 6102cdaf403d3b42b03838a61159bed8f085a363
+    plugin:
+      repo: mehnoorsiddiqui/petstore-context-plugin
+      tag: null
+      commit: b5eee98a3e7fe1fbbc1af1872134ffaf011f44dc
+      version: 1.0.1
+    generator_drift: false
+  1.0.2:
+    adopted: true
+    note: Hand-edited SDK (Order.Quantity int -> long), not built from an overlay; not a bench release.
+    overlays: []
+    spec_sha256: null
+    change_types: []
+    sdk:
+      package_id: SwaggerPetstoreOpenApi310
+      version: 1.0.2
+      repo: mehnoorsiddiqui/petstore-sdk-csharp
+      tag: v1.0.2
+      commit: ee569108d6c0bfe43a930e6027c185aed8091c30
+    plugin:
+      repo: mehnoorsiddiqui/petstore-context-plugin
+      tag: null
+      commit: f95c133e05d87dfea7fede1ea377daa96c3c44ad
+      version: 1.0.2
+    generator_drift: false

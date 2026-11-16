@@ -14,10 +14,10 @@ from __future__ import annotations
 import json
 from dataclasses import dataclass, field
 
-from jsonschema import Draft202012Validator
+from jsonschema import Draft7Validator, Draft202012Validator
 
-from .build import spec_sha256
-from .config import Bench, BenchError, load_yaml, parse_semver, releases_from_data
+from .build import apimatic_config, spec_sha256
+from .config import Api, Bench, BenchError, load_json, load_yaml, parse_semver, releases_from_data
 from .lock import load_lock
 
 
@@ -59,6 +59,44 @@ def validate_catalog(bench: Bench, problems: Problems) -> None:
         problems.error(str(exc))
 
 
+def validate_config_template(bench: Bench, api: Api, problems: Problems) -> None:
+    """apis/<api>/apimatic.json is optional; bench owns its plugin identity, version and languages."""
+    path = api.config_template_path
+    if not path.is_file():
+        return
+    where = f"apis/{api.name}/apimatic.json"
+    try:
+        template = load_json(path)
+    except BenchError as exc:
+        problems.error(str(exc))
+        return
+    if not isinstance(template, dict):
+        problems.error(f"{where}: must be a JSON object")
+        return
+
+    plugin = template.get("plugin") or {}
+    for key, expected in (("pluginId", api.plugin_id), ("pluginName", api.plugin_name)):
+        if key in plugin and plugin[key] != expected:
+            problems.error(f"{where}: plugin.{key} is {plugin[key]!r} but api.yaml says {expected!r} (api.yaml wins; make them agree or drop it here)")
+    if "pluginVersion" in plugin:
+        problems.warn(f"{where}: plugin.pluginVersion is ignored; each release sets it to its own version")
+    for language, entry in (template.get("languages") or {}).items():
+        if language != "csharp":
+            problems.error(f"{where}: languages.{language}: the bench publishes C# only")
+        elif isinstance(entry, dict) and "publishing" in entry:
+            problems.error(
+                f"{where}: languages.csharp.publishing must not be in the template: `sdk publish` writes it for each "
+                "release, and a copied record would point `plugin generate` at another SDK"
+            )
+
+    # what the CLI will actually read: the template with the per-version parts filled in
+    config = apimatic_config(api, bench.releases(api).base)
+    validator = Draft7Validator(json.loads((bench.root / "schemas" / "apimatic.schema.json").read_text(encoding="utf-8")))
+    for err in sorted(validator.iter_errors(config), key=lambda e: list(e.path)):
+        loc = "/".join(str(p) for p in err.path) or "(root)"
+        problems.error(f"{where}: {loc}: {err.message} (checked against the APIMatic CLI's apimatic.schema.json)")
+
+
 def validate_api(bench: Bench, name: str, problems: Problems) -> None:
     where = f"apis/{name}"
     data = bench.api_data(name)
@@ -69,9 +107,16 @@ def validate_api(bench: Bench, name: str, problems: Problems) -> None:
     api = bench.api(name)
     if api.profile_id is None:
         problems.warn(f"{where}/api.yaml: profile_id is not set; releases of {name} cannot be published yet")
-    for path in (api.base_spec_path, api.meta_path):
-        if not path.is_file():
-            problems.error(f"{where}: missing {path.relative_to(api.dir).as_posix()}")
+    if not api.base_spec_path.is_file():
+        problems.error(f"{where}: missing spec/openapi.yaml")
+    if api.meta_path.is_file():
+        meta = load_json(api.meta_path)
+        if isinstance(meta, dict) and ("CodeGenSettings" in meta or "TestGenSettings" in meta):
+            problems.warn(
+                f"{where}/spec/APIMATIC-META.json: CodeGenSettings/TestGenSettings are ignored by Codegen v4 "
+                "(the SDK name comes from info.title)"
+            )
+    validate_config_template(bench, api, problems)
     if not problems.ok:
         return
 
@@ -158,6 +203,12 @@ def validate_api(bench: Bench, name: str, problems: Problems) -> None:
         return
     for version, entry in lock.items():
         lock_where = f"{where}/releases.lock.yaml: {version}"
+        if entry.get("adopted"):
+            # Published before/outside the bench (e.g. an existing SDK the bench took over): it is in
+            # the lock only so it is never published again, and nothing about it can be rebuilt.
+            if version != releases.base and any(r.version == version for r in releases.releases):
+                problems.error(f"{lock_where} is an adopted (already published) version; don't declare it under releases")
+            continue
         try:
             declared = releases.overlays_for(version)
         except BenchError:

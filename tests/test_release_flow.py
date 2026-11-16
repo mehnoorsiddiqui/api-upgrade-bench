@@ -31,6 +31,14 @@ class FakeWorld:
         self.nuget: set[str] = set()
         self.calls: list[str] = []
         self.fail_plugin_push_once = False
+        self.publish_types: list[tuple] = []
+
+    def dispatch_workflow(self, repo, workflow, ref, inputs, token):
+        """The SDK repo's NuGet workflow: publishes inputs['version'] and tags the branch head."""
+        self.calls.append(f"dispatch {repo} {workflow} {inputs['version']}")
+        self.nuget.add(inputs["version"])
+        head = git("rev-parse", ref, cwd=self.bare(repo))
+        git("tag", f"v{inputs['version']}", head, cwd=self.bare(repo))
 
     def bare(self, repo):
         return self.github / f"{repo}.git"
@@ -40,8 +48,10 @@ class FakeWorld:
         spec = (project_dir / "src" / "spec" / "openapi.json").read_bytes()
         return {"README.md": f"SDK {version}\n", "spec.sha": hashlib.sha256(spec).hexdigest() + "\n"}
 
-    def sdk_publish(self, project_dir, destination, profile_id, version, *, dry_run=False):
+    def sdk_publish(self, project_dir, destination, profile_id, version, *, dry_run=False,
+                    publish_types=("package", "sourcecode")):
         self.calls.append(f"sdk_publish {version}{' dry' if dry_run else ''}")
+        self.publish_types.append(tuple(publish_types))
         destination.mkdir(parents=True, exist_ok=True)
         for name, text in self.generated_files(project_dir, version).items():
             (destination / name).write_text(text)
@@ -55,14 +65,16 @@ class FakeWorld:
         git("add", "-A", cwd=work)
         git("-c", "user.name=t", "-c", "user.email=t@t", "commit", "-qm", f"v{version}", cwd=work)
         git("push", "-q", "origin", "main", cwd=work)  # APIMatic does not tag here: exercises the fallback
-        self.nuget.add(version)
-        config_path = project_dir / "src" / "apimatic.json"
-        config = json.loads(config_path.read_text())
-        config["languages"]["csharp"]["publishing"] = {
+        record = {
             "source": {"repositoryUrl": "https://github.com/owner/bench-mini-sdk-csharp", "branch": "main"},
-            "package": {"version": version},
             "packageConfiguration": {"packageId": "ApimaticBench.Mini"},
         }
+        if "package" in publish_types:  # a source-only publish records no package version
+            self.nuget.add(version)
+            record["package"] = {"version": version}
+        config_path = project_dir / "src" / "apimatic.json"
+        config = json.loads(config_path.read_text())
+        config["languages"]["csharp"]["publishing"] = record
         config_path.write_text(json.dumps(config))
 
     def plugin_generate(self, project_dir, destination, key):
@@ -93,6 +105,7 @@ def world(mini_repo, tmp_path, monkeypatch):
     monkeypatch.setattr(release_mod, "has_version", lambda pkg, v: v in w.nuget)
     monkeypatch.setattr(release_mod, "wait_for_version", lambda pkg, v, timeout_s: None)
     monkeypatch.setattr(release_mod, "create_remote_tag", w.create_remote_tag)
+    monkeypatch.setattr(release_mod, "dispatch_workflow", w.dispatch_workflow)
 
     real_push = release_mod.push_plugin
 
@@ -202,3 +215,23 @@ def test_mislabelled_release_is_not_published(mini_repo, world):
     with pytest.raises(BenchError, match="does not match the declared change types"):
         release_api(Bench(mini_repo.root), "mini", ReleaseOptions(version="2.0.0"))
     assert not any(c.startswith("sdk_publish 2.0.0") for c in world.calls)
+
+
+@needs_oasdiff
+def test_nuget_published_by_the_sdk_repo_workflow(mini_repo, world):
+    import yaml
+
+    path = mini_repo.root / "apis" / "mini" / "api.yaml"
+    data = yaml.safe_load(path.read_text())
+    data["nuget_publisher"] = "sdk-repo-workflow"
+    write_yaml(path, data)
+    bench = Bench(mini_repo.root)
+
+    assert release_api(bench, "mini", ReleaseOptions()) == ["1.0.0", "2.0.0"]
+    assert set(world.publish_types) == {("sourcecode",)}  # APIMatic never pushes the package
+    assert "dispatch owner/bench-mini-sdk-csharp publish-nuget.yml 2.0.0" in world.calls
+    assert not any(c.startswith("tag ") for c in world.calls)  # the workflow's own tag is used
+    assert world.nuget == {"1.0.0", "2.0.0"}
+    entry = load_lock(bench.api("mini"))["2.0.0"]
+    assert entry["sdk"]["commit"] == git("rev-parse", "v2.0.0^{commit}", cwd=world.bare("owner/bench-mini-sdk-csharp"))
+    assert entry["publish_record"] == "published"

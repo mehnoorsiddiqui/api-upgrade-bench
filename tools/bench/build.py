@@ -3,12 +3,17 @@
 Layout written (always fresh):
 
     build/<api>/<version>/src/spec/openapi.json        base + the version's overlays, info.version = version
-    build/<api>/<version>/src/spec/APIMATIC-META.json  copied from apis/<api>/spec/
-    build/<api>/<version>/src/apimatic.json            plugin identity (version in lockstep with the SDK) + csharp
+    build/<api>/<version>/src/apimatic.json            apis/<api>/apimatic.json (optional template) + plugin
+                                                       identity (version in lockstep with the SDK) + csharp
+    build/<api>/<version>/src/spec/APIMATIC-META.json  only if apis/<api>/spec/ has one (optional)
+
+Project settings live in `apimatic.json` (it replaced CLI v1's APIMATIC-BUILD.json). Codegen v4 does
+not read `CodeGenSettings`, so the SDK's project name and namespace come from the spec's info.title.
 """
 
 from __future__ import annotations
 
+import copy
 import hashlib
 import json
 import os
@@ -18,7 +23,7 @@ import sys
 from dataclasses import dataclass
 from pathlib import Path
 
-from .config import Api, Bench, BenchError, parse_semver
+from .config import Api, Bench, BenchError, load_json, parse_semver
 from .overlay import OverlayError, apply_overlays
 
 
@@ -56,16 +61,29 @@ def build_spec(bench: Bench, api: Api, version: str, overlay_ids: tuple[str, ...
 
 
 def apimatic_config(api: Api, version: str) -> dict:
-    return {
-        "schemaVersion": 1,
-        "plugin": {
-            "pluginId": api.plugin_id,
-            "pluginName": api.plugin_name,
-            "pluginVersion": version,
-            "license": "MIT",
-        },
-        "languages": {"csharp": {}},
+    """`src/apimatic.json` for one version: apis/<api>/apimatic.json (if any) with the per-version parts set.
+
+    Everything in the template is kept (portal settings, plugin author/license/pluginKey, ...), except:
+    * plugin.pluginId / pluginName come from api.yaml, and pluginVersion is the release version
+      (the plugin is versioned in lockstep with the SDK);
+    * languages is exactly {"csharp": {}}: the publishing record must be the one this run's
+      `sdk publish` writes, never one copied from elsewhere.
+    """
+    template = load_json(api.config_template_path) if api.config_template_path.is_file() else {}
+    if not isinstance(template, dict):
+        raise BenchError(f"{api.config_template_path}: must be a JSON object")
+    config = copy.deepcopy(template)
+    config["schemaVersion"] = 1
+    plugin = config.get("plugin") if isinstance(config.get("plugin"), dict) else {}
+    config["plugin"] = {
+        **plugin,
+        "pluginId": api.plugin_id,
+        "pluginName": api.plugin_name,
+        "pluginVersion": version,
+        "license": plugin.get("license", "MIT"),
     }
+    config["languages"] = {"csharp": {}}
+    return config
 
 
 def remove_tree(path: Path) -> None:
@@ -88,9 +106,8 @@ def write_project(project_dir: Path, api: Api, spec: dict, version: str) -> byte
     spec_dir.mkdir(parents=True)
     data = spec_bytes(spec)
     (spec_dir / "openapi.json").write_bytes(data)
-    if not api.meta_path.is_file():
-        raise BenchError(f"missing {api.meta_path}")
-    shutil.copyfile(api.meta_path, spec_dir / "APIMATIC-META.json")
+    if api.meta_path.is_file():  # optional: import/merge/validation settings only
+        shutil.copyfile(api.meta_path, spec_dir / "APIMATIC-META.json")
     (project_dir / "src" / "apimatic.json").write_text(
         json.dumps(apimatic_config(api, version), indent=2) + "\n", encoding="utf-8", newline="\n"
     )

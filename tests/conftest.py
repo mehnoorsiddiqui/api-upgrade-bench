@@ -85,7 +85,6 @@ def mini_repo(tmp_path: Path, monkeypatch) -> Bench:
         },
     )
     write_yaml(api / "spec" / "openapi.yaml", MINI_SPEC)
-    (api / "spec" / "APIMATIC-META.json").write_text('{"CodeGenSettings": {"ProjectName": "BenchMini"}}\n', encoding="utf-8")
     write_yaml(api / "overlays" / "rename-op.yaml", RENAME_OP)
     write_yaml(api / "overlays" / "rename-param.yaml", RENAME_PARAM)
     write_yaml(
