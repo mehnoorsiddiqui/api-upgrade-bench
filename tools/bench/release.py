@@ -13,7 +13,9 @@ Per version:
 
 Idempotent: a version already in the lock is skipped; within a version, a step whose result
 already exists (NuGet version, SDK tag, plugin tag) is not repeated, so re-running after a
-partial failure completes the release instead of publishing twice.
+partial failure completes the release instead of publishing twice. A version already on NuGet
+but without its SDK tag (APIMatic published the package but not the source) gets a source-only
+publish.
 """
 
 from __future__ import annotations
@@ -88,30 +90,34 @@ def _publish_sdk(
     on_nuget = has_version(api.nuget_package_id, version)
     sdk_commit = remote_tag_commit(api.sdk_repo, tag, token)
 
-    if on_nuget or sdk_commit:
+    if sdk_commit:
         print(
             f"SDK {version} was already published (NuGet: {'yes' if on_nuget else 'no'}, "
-            f"{api.sdk_repo}@{tag}: {'yes' if sdk_commit else 'no'}); not publishing again",
+            f"{api.sdk_repo}@{tag}: yes); not publishing again",
             flush=True,
         )
         apimatic.write_publish_record(
             b.project_dir, apimatic.reconstructed_record(api.sdk_repo, api.sdk_branch, api.nuget_package_id, version)
         )
         record_kind = "reconstructed"
-        if not sdk_commit:
-            # Only right after our own publish is the branch head known to be this version's commit.
-            raise BenchError(
-                f"{api.nuget_package_id} {version} is on NuGet but {api.sdk_repo} has no {tag}: the earlier run "
-                f"stopped between package and source publishing. Tag the commit that holds {version} by hand "
-                f"(gh api -X POST repos/{api.sdk_repo}/git/refs -f ref=refs/tags/{tag} -f sha=<commit>) and re-run."
-            )
     else:
         by_workflow = api.nuget_publisher == "sdk-repo-workflow"
-        apimatic.sdk_publish(b.project_dir, sdk_dir, profile_id, version, publish_types=api.publish_types)
+        # On NuGet but no tag: an earlier publish got the package out but not the source (APIMatic
+        # reports the two targets separately). NuGet versions are permanent, so publish the source only.
+        source_only = on_nuget or by_workflow
+        if on_nuget:
+            print(
+                f"{api.nuget_package_id} {version} is already on NuGet but {api.sdk_repo} has no {tag}: "
+                "publishing the source code only",
+                flush=True,
+            )
+        apimatic.sdk_publish(
+            b.project_dir, sdk_dir, profile_id, version, publish_types=("sourcecode",) if source_only else api.publish_types
+        )
         record = apimatic.publish_record(b.project_dir) or {}
-        if by_workflow:
-            # A source-only publish records no package version; the SDK repo's workflow publishes it.
-            # Record it ourselves so `plugin generate` sees the version that is about to be on NuGet.
+        if source_only:
+            # A source-only publish records no package version (the package is already on NuGet, or the
+            # SDK repo's workflow publishes it). Record it ourselves so `plugin generate` sees it.
             record.setdefault("packageConfiguration", {}).setdefault("packageId", api.nuget_package_id)
             record["package"] = {"version": version}
             apimatic.write_publish_record(b.project_dir, record)
@@ -131,7 +137,7 @@ def _publish_sdk(
                 f"the publishing profile published package {package_id!r}, but api.yaml says {api.nuget_package_id!r}"
             )
         record_kind = "published"
-        if by_workflow:
+        if by_workflow and not on_nuget:
             # The workflow builds the commit APIMatic just pushed, publishes `version`, then tags it.
             dispatch_workflow(api.sdk_repo, api.nuget_workflow, api.sdk_branch, {"version": version}, token)
             wait_for_version(api.nuget_package_id, version, timeout_s=nuget_timeout_s)

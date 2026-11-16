@@ -4,10 +4,10 @@ name: petstore
 # with the same generator, so the diff between two versions is only the overlays.
 #
 # From `apimatic publishing profile list`: the profile that publishes ApimaticBench.Petstore to
-# NuGet and the source to bench-petstore-sdk-csharp.
+# NuGet and the source to apimatic-bench-petstore-dotnet-sdk (a repo APIMatic created for the profile).
 profile_id: 6afad0c52f09fd9183fc6fb5
 nuget_package_id: ApimaticBench.Petstore
-sdk_repo: mehnoorsiddiqui/bench-petstore-sdk-csharp
+sdk_repo: mehnoorsiddiqui/apimatic-bench-petstore-dotnet-sdk
 plugin_repo: mehnoorsiddiqui/bench-petstore-context-plugin
 plugin_id: bench-petstore
 plugin_name: Bench Petstore
