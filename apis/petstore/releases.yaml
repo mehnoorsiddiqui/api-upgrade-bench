@@ -6,7 +6,6 @@
 # The base is 1.0.1: the existing SwaggerPetstoreOpenApi310 release the integration app pins.
 # It (and the hand-made 1.0.2) are already published, so the lock adopts them instead of publishing.
 base: 1.0.1
-releases: []
-# Next:
-#   - version: 2.0.0
-#     overlays: [rename-get-pet]
+releases:
+  - version: 2.0.0
+    overlays: [rename-status-param]   # GET /pet/findByStatus: query param `status` -> `petStatus`
