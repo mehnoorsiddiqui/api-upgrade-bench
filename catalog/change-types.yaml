@@ -10,6 +10,9 @@
 #                     the property is used in requests, responses, or both).
 #   oasdiff.allowed   further ids this type may produce. Anything detected that no declared type
 #                     requires or allows is an unlabelled change and fails the release.
+#                     `required: []` marks a type oasdiff cannot (always) see: documentation, an
+#                     unreferenced schema, a property of a schema no operation uses. Only `allowed`
+#                     is enforced for it.
 #
 # Check ids are oasdiff's (`oasdiff checks changelog`); tests verify they exist in the pinned
 # oasdiff version.
@@ -19,6 +22,7 @@
 ignored_checks:
   - api-version-not-bumped
   - api-version-decreased
+  - api-major-version-not-bumped
 
 change_types:
   - id: rename-operation
@@ -99,3 +103,803 @@ change_types:
         - api-security-component-added
         - api-security-component-removed
         - api-security-component-type-changed
+
+  # ---- Types for version histories imported from a real API (apis/square). Labels come from
+  # ---- tools/bench/snapshot_overlays.py; the allowed ids are oasdiff 1.35.0's own.
+  - id: add-endpoint
+    category: operation
+    breaking: false
+    description: "A new operation (path or method) is added."
+    oasdiff:
+      required:
+        - endpoint-added
+      allowed:
+        - api-tag-added
+        - endpoint-added
+
+  - id: remove-endpoint
+    category: operation
+    breaking: true
+    description: "An operation (path or method) is removed."
+    oasdiff:
+      required:
+        - [api-path-removed-before-sunset, api-path-removed-with-deprecation, api-path-removed-without-deprecation, api-removed-before-sunset, api-removed-with-deprecation, api-removed-without-deprecation]
+      allowed:
+        - api-path-removed-before-sunset
+        - api-path-removed-with-deprecation
+        - api-path-removed-without-deprecation
+        - api-removed-before-sunset
+        - api-removed-with-deprecation
+        - api-removed-without-deprecation
+        - api-tag-removed
+
+  - id: deprecate-endpoint
+    category: operation
+    breaking: false
+    description: "An operation is marked deprecated (`deprecated` / `x-deprecation`)."
+    oasdiff:
+      required: []
+      allowed:
+        - api-deprecated-sunset-missing
+        - api-deprecated-sunset-parse
+        - endpoint-deprecated
+        - endpoint-deprecated-with-sunset
+        - endpoint-reactivated
+
+  - id: add-optional-parameter
+    category: parameter
+    breaking: false
+    description: "An operation gains a new optional parameter."
+    oasdiff:
+      required:
+        - [new-optional-request-default-parameter-to-existing-path, new-optional-request-parameter]
+      allowed:
+        - new-optional-request-default-parameter-to-existing-path
+        - new-optional-request-parameter
+
+  - id: remove-parameter
+    category: parameter
+    breaking: true
+    description: "An operation loses a parameter."
+    oasdiff:
+      required:
+        - [request-parameter-removed, request-parameter-removed-before-sunset, request-parameter-removed-with-deprecation]
+      allowed:
+        - request-parameter-removed
+        - request-parameter-removed-before-sunset
+        - request-parameter-removed-with-deprecation
+
+  - id: parameter-became-required
+    category: parameter
+    breaking: true
+    description: "An optional parameter becomes required."
+    oasdiff:
+      required:
+        - request-parameter-became-required
+      allowed:
+        - request-parameter-became-required
+
+  - id: parameter-became-optional
+    category: parameter
+    breaking: true
+    description: "A required parameter becomes optional (the SDK parameter type becomes nullable)."
+    oasdiff:
+      required:
+        - request-parameter-became-optional
+      allowed:
+        - request-parameter-became-optional
+
+  - id: change-parameter-type
+    category: parameter
+    breaking: true
+    description: "A parameter keeps its name but its schema type (or serialization style) changes."
+    oasdiff:
+      required: []
+      allowed:
+        - request-parameter-became-not-enum
+        - request-parameter-list-of-types-narrowed
+        - request-parameter-list-of-types-widened
+        - request-parameter-property-became-not-enum
+        - request-parameter-property-list-of-types-narrowed
+        - request-parameter-property-list-of-types-widened
+        - request-parameter-property-type-changed
+        - request-parameter-property-type-generalized
+        - request-parameter-property-type-specialized
+        - request-parameter-type-changed
+        - request-parameter-type-generalized
+
+  - id: add-model
+    category: model
+    breaking: false
+    description: "A new schema is added (oasdiff reports nothing until an operation uses it)."
+    oasdiff:
+      required: []
+      allowed: []
+
+  - id: remove-model
+    category: model
+    breaking: true
+    description: "A schema is removed, so the SDK type disappears."
+    oasdiff:
+      required:
+        - api-schema-removed
+      allowed:
+        - api-schema-removed
+
+  - id: add-optional-property
+    category: model
+    breaking: false
+    description: "A schema gains an optional property."
+    oasdiff:
+      required: []
+      allowed:
+        - new-optional-request-property
+        - response-optional-property-added
+        - response-optional-write-only-property-added
+
+  - id: add-required-property
+    category: model
+    breaking: true
+    description: "A schema gains a required property."
+    oasdiff:
+      required: []
+      allowed:
+        - new-required-request-property
+        - new-required-request-property-with-default
+        - response-required-property-added
+        - response-required-write-only-property-added
+
+  - id: remove-property
+    category: model
+    breaking: true
+    description: "A property is removed from a schema."
+    oasdiff:
+      required: []
+      allowed:
+        - request-property-removed
+        - response-optional-property-removed
+        - response-optional-write-only-property-removed
+        - response-required-property-removed
+        - response-required-property-removed-before-sunset
+        - response-required-property-removed-with-deprecation
+        - response-required-write-only-property-removed
+
+  - id: change-property-model
+    category: model
+    breaking: true
+    description: "A property keeps its name but its $ref points at another schema (e.g. AdditionalRecipient -> ChargeRequestAdditionalRecipient). oasdiff compares the two schemas, so it reports their differences rather than a type change."
+    oasdiff:
+      required: []
+      allowed:
+        - new-optional-request-property
+        - new-required-request-property
+        - new-required-request-property-with-default
+        - request-optional-property-became-not-read-only
+        - request-optional-property-became-not-write-only
+        - request-optional-property-became-read-only
+        - request-optional-property-became-write-only
+        - request-parameter-property-became-not-nullable
+        - request-parameter-property-became-nullable
+        - request-property-became-enum
+        - request-property-became-not-enum
+        - request-property-became-not-nullable
+        - request-property-became-nullable
+        - request-property-became-optional
+        - request-property-became-required
+        - request-property-enum-value-added
+        - request-property-enum-value-removed
+        - request-property-exclusive-max-decreased
+        - request-property-exclusive-max-increased
+        - request-property-exclusive-max-set
+        - request-property-exclusive-max-unset
+        - request-property-exclusive-min-decreased
+        - request-property-exclusive-min-increased
+        - request-property-exclusive-min-set
+        - request-property-exclusive-min-unset
+        - request-property-max-decreased
+        - request-property-max-increased
+        - request-property-max-items-decreased
+        - request-property-max-items-increased
+        - request-property-max-items-set
+        - request-property-max-items-unset
+        - request-property-max-length-decreased
+        - request-property-max-length-increased
+        - request-property-max-length-set
+        - request-property-max-length-unset
+        - request-property-max-properties-decreased
+        - request-property-max-properties-increased
+        - request-property-max-properties-set
+        - request-property-max-properties-unset
+        - request-property-max-set
+        - request-property-max-unset
+        - request-property-min-decreased
+        - request-property-min-increased
+        - request-property-min-items-decreased
+        - request-property-min-items-increased
+        - request-property-min-items-set
+        - request-property-min-items-unset
+        - request-property-min-length-decreased
+        - request-property-min-length-increased
+        - request-property-min-length-set
+        - request-property-min-length-unset
+        - request-property-min-properties-decreased
+        - request-property-min-properties-increased
+        - request-property-min-properties-set
+        - request-property-min-properties-unset
+        - request-property-min-set
+        - request-property-min-unset
+        - request-property-pattern-added
+        - request-property-pattern-changed
+        - request-property-pattern-generalized
+        - request-property-pattern-removed
+        - request-property-removed
+        - request-property-type-changed
+        - request-property-type-compatible
+        - request-property-type-generalized
+        - request-required-property-became-not-read-only
+        - request-required-property-became-not-write-only
+        - request-required-property-became-read-only
+        - request-required-property-became-write-only
+        - response-optional-property-added
+        - response-optional-property-became-not-read-only
+        - response-optional-property-became-not-write-only
+        - response-optional-property-became-read-only
+        - response-optional-property-became-write-only
+        - response-optional-property-removed
+        - response-optional-write-only-property-added
+        - response-optional-write-only-property-removed
+        - response-property-became-enum
+        - response-property-became-not-enum
+        - response-property-became-not-nullable
+        - response-property-became-nullable
+        - response-property-became-optional
+        - response-property-became-required
+        - response-property-enum-value-added
+        - response-property-enum-value-removed
+        - response-property-exclusive-max-decreased
+        - response-property-exclusive-max-increased
+        - response-property-exclusive-max-set
+        - response-property-exclusive-max-unset
+        - response-property-exclusive-min-decreased
+        - response-property-exclusive-min-increased
+        - response-property-exclusive-min-set
+        - response-property-exclusive-min-unset
+        - response-property-max-decreased
+        - response-property-max-increased
+        - response-property-max-items-decreased
+        - response-property-max-items-increased
+        - response-property-max-items-set
+        - response-property-max-items-unset
+        - response-property-max-length-decreased
+        - response-property-max-length-increased
+        - response-property-max-length-set
+        - response-property-max-length-unset
+        - response-property-max-properties-decreased
+        - response-property-max-properties-increased
+        - response-property-max-properties-set
+        - response-property-max-properties-unset
+        - response-property-max-set
+        - response-property-max-unset
+        - response-property-min-decreased
+        - response-property-min-increased
+        - response-property-min-items-decreased
+        - response-property-min-items-increased
+        - response-property-min-items-set
+        - response-property-min-items-unset
+        - response-property-min-length-decreased
+        - response-property-min-length-increased
+        - response-property-min-length-set
+        - response-property-min-length-unset
+        - response-property-min-properties-decreased
+        - response-property-min-properties-increased
+        - response-property-min-properties-set
+        - response-property-min-properties-unset
+        - response-property-min-set
+        - response-property-min-unset
+        - response-property-pattern-added
+        - response-property-pattern-changed
+        - response-property-pattern-removed
+        - response-property-type-changed
+        - response-property-type-compatible
+        - response-property-type-generalized
+        - response-property-type-specialized
+        - response-required-property-added
+        - response-required-property-became-not-read-only
+        - response-required-property-became-not-write-only
+        - response-required-property-became-read-only
+        - response-required-property-became-write-only
+        - response-required-property-removed
+        - response-required-write-only-property-added
+        - response-required-write-only-property-removed
+
+  - id: became-enum
+    category: model
+    breaking: true
+    description: "A property or parameter that was a plain value becomes an enum type (e.g. string -> Currency). In OpenAPI 3.0 a $ref ignores its siblings, so oasdiff also reports a readOnly next to the new $ref as lost."
+    oasdiff:
+      required: []
+      allowed:
+        - request-body-became-enum
+        - request-header-property-became-enum
+        - request-parameter-became-enum
+        - request-parameter-type-changed
+        - request-parameter-type-generalized
+        - request-property-became-enum
+        - request-property-type-changed
+        - request-property-type-compatible
+        - request-property-type-generalized
+        - response-mediatype-became-enum
+        - response-property-became-enum
+        - response-property-type-changed
+        - response-property-type-compatible
+        - response-property-type-generalized
+        - response-property-type-specialized
+        - request-optional-property-became-not-read-only
+        - request-optional-property-became-not-write-only
+        - request-required-property-became-not-read-only
+        - request-required-property-became-not-write-only
+        - response-optional-property-became-not-read-only
+        - response-optional-property-became-not-write-only
+        - response-required-property-became-not-read-only
+        - response-required-property-became-not-write-only
+
+  - id: nullability-change
+    category: model
+    breaking: true
+    description: "A property or parameter becomes nullable or stops being nullable (the SDK type changes, e.g. long -> long?)."
+    oasdiff:
+      required: []
+      allowed:
+        - request-body-became-not-nullable
+        - request-body-became-nullable
+        - request-parameter-became-not-nullable
+        - request-parameter-became-nullable
+        - request-parameter-property-became-not-nullable
+        - request-parameter-property-became-nullable
+        - request-property-became-not-nullable
+        - request-property-became-nullable
+        - response-body-became-not-nullable
+        - response-body-became-nullable
+        - response-header-became-not-nullable
+        - response-header-became-nullable
+        - response-property-became-not-nullable
+        - response-property-became-nullable
+
+  - id: property-became-read-only
+    category: model
+    breaking: true
+    description: "A property becomes readOnly (or writeOnly), so callers can no longer send (or read) it."
+    oasdiff:
+      required: []
+      allowed:
+        - request-optional-property-became-read-only
+        - request-optional-property-became-write-only
+        - request-required-property-became-read-only
+        - request-required-property-became-write-only
+        - response-optional-property-became-read-only
+        - response-optional-property-became-write-only
+        - response-required-property-became-read-only
+        - response-required-property-became-write-only
+
+  - id: property-became-writable
+    category: model
+    breaking: false
+    description: "A property stops being readOnly (or writeOnly)."
+    oasdiff:
+      required: []
+      allowed:
+        - request-optional-property-became-not-read-only
+        - request-optional-property-became-not-write-only
+        - request-required-property-became-not-read-only
+        - request-required-property-became-not-read-only-in-openapi-31
+        - request-required-property-became-not-write-only
+        - response-optional-property-became-not-read-only
+        - response-optional-property-became-not-write-only
+        - response-required-property-became-not-read-only
+        - response-required-property-became-not-write-only
+
+  - id: property-became-optional
+    category: model
+    breaking: true
+    description: "A required property becomes optional (the SDK property type becomes nullable)."
+    oasdiff:
+      required: []
+      allowed:
+        - request-property-became-optional
+        - response-property-became-optional
+        - response-write-only-property-became-optional
+
+  - id: property-became-required
+    category: model
+    breaking: true
+    description: "An optional property becomes required."
+    oasdiff:
+      required: []
+      allowed:
+        - request-property-became-required
+        - request-property-became-required-with-default
+        - response-property-became-required
+        - response-write-only-property-became-required
+
+  - id: add-enum-value
+    category: model
+    breaking: false
+    description: "An enum gains values."
+    oasdiff:
+      required: []
+      allowed:
+        - request-body-enum-value-added
+        - request-parameter-enum-value-added
+        - request-parameter-property-enum-value-added
+        - request-property-enum-value-added
+        - response-mediatype-enum-value-added
+        - response-property-enum-value-added
+        - response-write-only-property-enum-value-added
+
+  - id: remove-enum-value
+    category: model
+    breaking: true
+    description: "An enum loses values (it may gain others in the same release)."
+    oasdiff:
+      required: []
+      allowed:
+        - request-body-enum-value-added
+        - request-body-enum-value-removed
+        - request-parameter-enum-value-added
+        - request-parameter-enum-value-removed
+        - request-parameter-property-enum-value-added
+        - request-parameter-property-enum-value-removed
+        - request-parameter-x-extensible-enum-value-removed
+        - request-property-enum-value-added
+        - request-property-enum-value-removed
+        - request-property-x-extensible-enum-value-removed
+        - request-read-only-property-enum-value-removed
+        - response-mediatype-enum-value-added
+        - response-mediatype-enum-value-removed
+        - response-property-enum-value-added
+        - response-property-enum-value-removed
+        - response-write-only-property-enum-value-added
+
+  - id: change-constraint
+    category: model
+    breaking: false
+    description: "Validation keywords (min/max, lengths, pattern, items, default) or a request body's `required` change; the SDK types stay the same."
+    oasdiff:
+      required: []
+      allowed:
+        - request-body-became-optional
+        - request-body-became-required
+        - request-body-default-value-added
+        - request-body-default-value-changed
+        - request-body-default-value-removed
+        - request-body-exclusive-max-decreased
+        - request-body-exclusive-max-increased
+        - request-body-exclusive-max-set
+        - request-body-exclusive-max-unset
+        - request-body-exclusive-min-decreased
+        - request-body-exclusive-min-increased
+        - request-body-exclusive-min-set
+        - request-body-exclusive-min-unset
+        - request-body-max-contains-decreased
+        - request-body-max-contains-increased
+        - request-body-max-contains-set
+        - request-body-max-contains-unset
+        - request-body-max-decreased
+        - request-body-max-increased
+        - request-body-max-items-decreased
+        - request-body-max-items-increased
+        - request-body-max-items-set
+        - request-body-max-items-unset
+        - request-body-max-length-decreased
+        - request-body-max-length-increased
+        - request-body-max-length-set
+        - request-body-max-length-unset
+        - request-body-max-properties-decreased
+        - request-body-max-properties-increased
+        - request-body-max-properties-set
+        - request-body-max-properties-unset
+        - request-body-max-set
+        - request-body-max-unset
+        - request-body-min-contains-decreased
+        - request-body-min-contains-increased
+        - request-body-min-contains-set
+        - request-body-min-contains-unset
+        - request-body-min-decreased
+        - request-body-min-increased
+        - request-body-min-items-decreased
+        - request-body-min-items-increased
+        - request-body-min-items-set
+        - request-body-min-items-unset
+        - request-body-min-length-decreased
+        - request-body-min-length-increased
+        - request-body-min-length-set
+        - request-body-min-length-unset
+        - request-body-min-properties-decreased
+        - request-body-min-properties-increased
+        - request-body-min-properties-set
+        - request-body-min-properties-unset
+        - request-body-min-set
+        - request-body-min-unset
+        - request-parameter-default-value-added
+        - request-parameter-default-value-changed
+        - request-parameter-default-value-removed
+        - request-parameter-exclusive-max-decreased
+        - request-parameter-exclusive-max-increased
+        - request-parameter-exclusive-max-set
+        - request-parameter-exclusive-max-unset
+        - request-parameter-exclusive-min-decreased
+        - request-parameter-exclusive-min-increased
+        - request-parameter-exclusive-min-set
+        - request-parameter-exclusive-min-unset
+        - request-parameter-max-contains-decreased
+        - request-parameter-max-contains-increased
+        - request-parameter-max-contains-set
+        - request-parameter-max-contains-unset
+        - request-parameter-max-decreased
+        - request-parameter-max-increased
+        - request-parameter-max-items-decreased
+        - request-parameter-max-items-increased
+        - request-parameter-max-items-set
+        - request-parameter-max-items-unset
+        - request-parameter-max-length-decreased
+        - request-parameter-max-length-increased
+        - request-parameter-max-length-set
+        - request-parameter-max-length-unset
+        - request-parameter-max-properties-decreased
+        - request-parameter-max-properties-increased
+        - request-parameter-max-properties-set
+        - request-parameter-max-properties-unset
+        - request-parameter-max-set
+        - request-parameter-max-unset
+        - request-parameter-min-contains-decreased
+        - request-parameter-min-contains-increased
+        - request-parameter-min-contains-set
+        - request-parameter-min-contains-unset
+        - request-parameter-min-decreased
+        - request-parameter-min-increased
+        - request-parameter-min-items-decreased
+        - request-parameter-min-items-increased
+        - request-parameter-min-items-set
+        - request-parameter-min-items-unset
+        - request-parameter-min-length-decreased
+        - request-parameter-min-length-increased
+        - request-parameter-min-length-set
+        - request-parameter-min-length-unset
+        - request-parameter-min-properties-decreased
+        - request-parameter-min-properties-increased
+        - request-parameter-min-properties-set
+        - request-parameter-min-properties-unset
+        - request-parameter-min-set
+        - request-parameter-min-unset
+        - request-parameter-pattern-added
+        - request-parameter-pattern-changed
+        - request-parameter-pattern-generalized
+        - request-parameter-pattern-removed
+        - request-property-default-value-added
+        - request-property-default-value-changed
+        - request-property-default-value-removed
+        - request-property-exclusive-max-decreased
+        - request-property-exclusive-max-increased
+        - request-property-exclusive-max-set
+        - request-property-exclusive-max-unset
+        - request-property-exclusive-min-decreased
+        - request-property-exclusive-min-increased
+        - request-property-exclusive-min-set
+        - request-property-exclusive-min-unset
+        - request-property-max-contains-decreased
+        - request-property-max-contains-increased
+        - request-property-max-contains-set
+        - request-property-max-contains-unset
+        - request-property-max-decreased
+        - request-property-max-increased
+        - request-property-max-items-decreased
+        - request-property-max-items-increased
+        - request-property-max-items-set
+        - request-property-max-items-unset
+        - request-property-max-length-decreased
+        - request-property-max-length-increased
+        - request-property-max-length-set
+        - request-property-max-length-unset
+        - request-property-max-properties-decreased
+        - request-property-max-properties-increased
+        - request-property-max-properties-set
+        - request-property-max-properties-unset
+        - request-property-max-set
+        - request-property-max-unset
+        - request-property-min-contains-decreased
+        - request-property-min-contains-increased
+        - request-property-min-contains-set
+        - request-property-min-contains-unset
+        - request-property-min-decreased
+        - request-property-min-increased
+        - request-property-min-items-decreased
+        - request-property-min-items-increased
+        - request-property-min-items-set
+        - request-property-min-items-unset
+        - request-property-min-length-decreased
+        - request-property-min-length-increased
+        - request-property-min-length-set
+        - request-property-min-length-unset
+        - request-property-min-properties-decreased
+        - request-property-min-properties-increased
+        - request-property-min-properties-set
+        - request-property-min-properties-unset
+        - request-property-min-set
+        - request-property-min-unset
+        - request-property-pattern-added
+        - request-property-pattern-changed
+        - request-property-pattern-generalized
+        - request-property-pattern-removed
+        - request-read-only-property-exclusive-max-decreased
+        - request-read-only-property-exclusive-min-increased
+        - request-read-only-property-max-decreased
+        - request-read-only-property-max-items-decreased
+        - request-read-only-property-max-length-decreased
+        - request-read-only-property-max-properties-decreased
+        - request-read-only-property-min-increased
+        - response-body-exclusive-max-decreased
+        - response-body-exclusive-max-increased
+        - response-body-exclusive-max-set
+        - response-body-exclusive-max-unset
+        - response-body-exclusive-min-decreased
+        - response-body-exclusive-min-increased
+        - response-body-exclusive-min-set
+        - response-body-exclusive-min-unset
+        - response-body-max-contains-decreased
+        - response-body-max-contains-increased
+        - response-body-max-contains-set
+        - response-body-max-contains-unset
+        - response-body-max-decreased
+        - response-body-max-increased
+        - response-body-max-items-decreased
+        - response-body-max-items-increased
+        - response-body-max-items-set
+        - response-body-max-items-unset
+        - response-body-max-length-decreased
+        - response-body-max-length-increased
+        - response-body-max-length-set
+        - response-body-max-length-unset
+        - response-body-max-properties-decreased
+        - response-body-max-properties-increased
+        - response-body-max-properties-set
+        - response-body-max-properties-unset
+        - response-body-max-set
+        - response-body-max-unset
+        - response-body-min-contains-decreased
+        - response-body-min-contains-increased
+        - response-body-min-contains-set
+        - response-body-min-contains-unset
+        - response-body-min-decreased
+        - response-body-min-increased
+        - response-body-min-items-decreased
+        - response-body-min-items-increased
+        - response-body-min-items-set
+        - response-body-min-items-unset
+        - response-body-min-length-decreased
+        - response-body-min-length-increased
+        - response-body-min-length-set
+        - response-body-min-length-unset
+        - response-body-min-properties-decreased
+        - response-body-min-properties-increased
+        - response-body-min-properties-set
+        - response-body-min-properties-unset
+        - response-body-min-set
+        - response-body-min-unset
+        - response-header-exclusive-max-decreased
+        - response-header-exclusive-max-increased
+        - response-header-exclusive-max-set
+        - response-header-exclusive-max-unset
+        - response-header-exclusive-min-decreased
+        - response-header-exclusive-min-increased
+        - response-header-exclusive-min-set
+        - response-header-exclusive-min-unset
+        - response-header-max-contains-decreased
+        - response-header-max-contains-increased
+        - response-header-max-contains-set
+        - response-header-max-contains-unset
+        - response-header-max-decreased
+        - response-header-max-increased
+        - response-header-max-items-decreased
+        - response-header-max-items-increased
+        - response-header-max-items-set
+        - response-header-max-items-unset
+        - response-header-max-length-decreased
+        - response-header-max-length-increased
+        - response-header-max-length-set
+        - response-header-max-length-unset
+        - response-header-max-properties-decreased
+        - response-header-max-properties-increased
+        - response-header-max-properties-set
+        - response-header-max-properties-unset
+        - response-header-max-set
+        - response-header-max-unset
+        - response-header-min-contains-decreased
+        - response-header-min-contains-increased
+        - response-header-min-contains-set
+        - response-header-min-contains-unset
+        - response-header-min-decreased
+        - response-header-min-increased
+        - response-header-min-items-decreased
+        - response-header-min-items-increased
+        - response-header-min-items-set
+        - response-header-min-items-unset
+        - response-header-min-length-decreased
+        - response-header-min-length-increased
+        - response-header-min-length-set
+        - response-header-min-length-unset
+        - response-header-min-properties-decreased
+        - response-header-min-properties-increased
+        - response-header-min-properties-set
+        - response-header-min-properties-unset
+        - response-header-min-set
+        - response-header-min-unset
+        - response-property-exclusive-max-decreased
+        - response-property-exclusive-max-increased
+        - response-property-exclusive-max-set
+        - response-property-exclusive-max-unset
+        - response-property-exclusive-min-decreased
+        - response-property-exclusive-min-increased
+        - response-property-exclusive-min-set
+        - response-property-exclusive-min-unset
+        - response-property-max-contains-decreased
+        - response-property-max-contains-increased
+        - response-property-max-contains-set
+        - response-property-max-contains-unset
+        - response-property-max-decreased
+        - response-property-max-increased
+        - response-property-max-items-decreased
+        - response-property-max-items-increased
+        - response-property-max-items-set
+        - response-property-max-items-unset
+        - response-property-max-length-decreased
+        - response-property-max-length-increased
+        - response-property-max-length-set
+        - response-property-max-length-unset
+        - response-property-max-properties-decreased
+        - response-property-max-properties-increased
+        - response-property-max-properties-set
+        - response-property-max-properties-unset
+        - response-property-max-set
+        - response-property-max-unset
+        - response-property-min-contains-decreased
+        - response-property-min-contains-increased
+        - response-property-min-contains-set
+        - response-property-min-contains-unset
+        - response-property-min-decreased
+        - response-property-min-increased
+        - response-property-min-items-decreased
+        - response-property-min-items-increased
+        - response-property-min-items-set
+        - response-property-min-items-unset
+        - response-property-min-length-decreased
+        - response-property-min-length-increased
+        - response-property-min-length-set
+        - response-property-min-length-unset
+        - response-property-min-properties-decreased
+        - response-property-min-properties-increased
+        - response-property-min-properties-set
+        - response-property-min-properties-unset
+        - response-property-min-set
+        - response-property-min-unset
+        - response-property-pattern-added
+        - response-property-pattern-changed
+        - response-property-pattern-removed
+
+  - id: release-status-change
+    category: metadata
+    breaking: false
+    description: "A release status changes (x-release-status, e.g. BETA -> PUBLIC; deprecation of a schema). oasdiff does not see it."
+    oasdiff:
+      required: []
+      allowed: []
+
+  - id: docs-and-metadata
+    category: metadata
+    breaking: false
+    description: "Descriptions, summaries, examples, tags and other x- extensions change. oasdiff does not see it."
+    oasdiff:
+      required: []
+      allowed:
+        - api-tag-added
+        - api-tag-removed
+

@@ -10,7 +10,7 @@ from pathlib import Path
 from . import apimatic
 from .build import build
 from .config import Bench, BenchError
-from .diffcheck import diffcheck
+from .diffcheck import diffcheck, diffcheck_overlay
 from .export_dep_agent import change_matrix, export
 from .lock import load_lock, pending_versions
 from .nuget_wait import wait_for_version
@@ -45,14 +45,13 @@ def cmd_diffcheck(bench: Bench, args) -> int:
 
 
 def cmd_diffcheck_overlays(bench: Bench, args) -> int:
-    """Every overlay, applied alone to the base, must produce exactly its declared change type."""
+    """Every overlay, applied to the base (after the overlays it requires), must produce exactly its
+    declared change type."""
     failed = []
     for name in args.api or bench.api_names():
         api = bench.api(name)
         for overlay_id in bench.overlay_ids(api):
-            result = build(bench, name, "0.0.0", overlay_ids=(overlay_id,),
-                           project_dir=bench.build_dir / name / "_overlay" / overlay_id)
-            diff = diffcheck(api.base_spec_path, result.spec_path, list(result.change_types), bench.catalog)
+            diff = diffcheck_overlay(bench, name, overlay_id, bench.build_dir / name / "_overlay" / overlay_id)
             print(f"--- {name}/{overlay_id}\n{diff.report()}")
             if not diff.ok:
                 failed.append(f"{name}/{overlay_id}")
@@ -92,7 +91,7 @@ def cmd_check(bench: Bench, args) -> int:
         print("offline: skipping apimatic api validate and the compile check")
         return 0
     key = apimatic.api_key(required=False)
-    apimatic.validate(result.project_dir, key)
+    apimatic.validate(result.project_dir, key, api.validate_fails_on)
     if not args.no_compile:
         compile_check(result.project_dir, key)
     return 0

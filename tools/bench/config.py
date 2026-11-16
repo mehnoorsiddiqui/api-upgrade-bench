@@ -12,6 +12,9 @@ from typing import Any
 
 import yaml
 
+# libyaml when available: a real API's base spec and overlays run to megabytes
+YAML_LOADER = getattr(yaml, "CSafeLoader", yaml.SafeLoader)
+
 SEMVER = re.compile(r"^(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)$")
 
 
@@ -29,7 +32,7 @@ def parse_semver(version: str) -> tuple[int, int, int]:
 def load_yaml(path: Path) -> Any:
     try:
         with path.open(encoding="utf-8") as fh:
-            return yaml.safe_load(fh)
+            return yaml.load(fh, Loader=YAML_LOADER)  # noqa: S506 - a safe loader
     except FileNotFoundError as exc:
         raise BenchError(f"missing file: {path}") from exc
     except yaml.YAMLError as exc:
@@ -125,6 +128,8 @@ class Api:
     # SDK repo that bench dispatches with the version after APIMatic publishes the source.
     nuget_publisher: str = "apimatic"
     nuget_workflow: str = "publish-nuget.yml"
+    # what makes `apimatic api validate` fail a check or release: any error, or only blocking ones
+    validate_fails_on: str = "errors"
 
     @property
     def publish_types(self) -> tuple[str, ...]:
@@ -168,6 +173,10 @@ class Overlay:
     type: str
     breaking: bool
     targets: tuple[str, ...]
+    # Overlays that must be applied before this one (`x-change.requires`). A star-topology version
+    # never needs it; a version history imported from a real API does, because a later step can
+    # change what an earlier step added.
+    requires: tuple[str, ...] = ()
 
 
 @dataclass(frozen=True)
@@ -215,6 +224,8 @@ def releases_from_data(data: Any, where: str = "releases.yaml") -> Releases:
 class Bench:
     root: Path
     _overlay_cache: dict = field(default_factory=dict, repr=False)
+    _base_cache: dict = field(default_factory=dict, repr=False)
+    _built_cache: dict = field(default_factory=dict, repr=False)  # (api, overlay ids) -> spec
 
     @classmethod
     def discover(cls) -> "Bench":
@@ -261,6 +272,7 @@ class Bench:
                 drift_ignore=tuple(data.get("drift_ignore") or ()),
                 nuget_publisher=data.get("nuget_publisher", "apimatic"),
                 nuget_workflow=data.get("nuget_workflow", "publish-nuget.yml"),
+                validate_fails_on=data.get("validate_fails_on", "errors"),
             )
         except KeyError as exc:
             raise BenchError(f"apis/{name}/api.yaml: missing {exc.args[0]!r}") from exc
@@ -286,15 +298,40 @@ class Bench:
             type=str(change.get("type", "")),
             breaking=bool(change.get("breaking", False)),
             targets=tuple(change.get("targets") or ()),
+            requires=tuple(str(r) for r in change.get("requires") or ()),
         )
         self._overlay_cache[key] = overlay
         return overlay
+
+    def prerequisites(self, api: Api, overlay_id: str) -> tuple[str, ...]:
+        """Every overlay `overlay_id` needs (`x-change.requires`, transitively), in apply order:
+        each one after everything it requires itself. `overlay_id` is not included."""
+        order: list[str] = []
+        visiting: list[str] = []
+
+        def visit(oid: str) -> None:
+            if oid in order:
+                return
+            if oid in visiting:
+                cycle = " -> ".join(visiting[visiting.index(oid):] + [oid])
+                raise BenchError(f"apis/{api.name}: overlays require each other in a cycle: {cycle}")
+            visiting.append(oid)
+            for dep in self.overlay(api, oid).requires:
+                visit(dep)
+            visiting.pop()
+            order.append(oid)
+
+        visit(overlay_id)
+        return tuple(order[:-1])
 
     def releases(self, api: Api) -> Releases:
         return releases_from_data(load_yaml(api.releases_path), f"apis/{api.name}/releases.yaml")
 
     def base_spec(self, api: Api) -> dict:
-        spec = load_yaml(api.base_spec_path)
-        if not isinstance(spec, dict) or "openapi" not in spec:
-            raise BenchError(f"{api.base_spec_path}: not an OpenAPI document")
-        return spec
+        """The parsed base spec, read once per Bench. Shared: callers must not modify it."""
+        if api.name not in self._base_cache:
+            spec = load_yaml(api.base_spec_path)
+            if not isinstance(spec, dict) or "openapi" not in spec:
+                raise BenchError(f"{api.base_spec_path}: not an OpenAPI document")
+            self._base_cache[api.name] = spec
+        return self._base_cache[api.name]

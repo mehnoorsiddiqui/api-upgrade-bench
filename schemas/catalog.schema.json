@@ -24,8 +24,8 @@
             "required": ["required"],
             "properties": {
               "required": {
+                "description": "Empty for a change type oasdiff cannot see (documentation, an unreferenced schema): then only `allowed` is enforced.",
                 "type": "array",
-                "minItems": 1,
                 "items": {
                   "oneOf": [
                     { "$ref": "#/$defs/checkId" },

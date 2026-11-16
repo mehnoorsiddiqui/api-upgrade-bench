@@ -13,7 +13,7 @@ import yaml
 
 from bench.build import build
 from bench.config import Bench
-from bench.diffcheck import diffcheck, evaluate, oasdiff_exe
+from bench.diffcheck import diffcheck, diffcheck_overlay, evaluate, oasdiff_exe
 
 from conftest import FIXTURES, REPO, needs_oasdiff, write_yaml
 
@@ -104,14 +104,17 @@ def test_catalog_check_ids_exist_in_pinned_oasdiff(catalog):
     assert sorted(used - known) == []
 
 
+@pytest.fixture(scope="module")
+def repo_bench():
+    # one Bench for every overlay: it caches the base spec and built prefixes, which an imported
+    # history (dozens of overlays on a multi-megabyte spec) needs
+    return Bench(REPO)
+
+
 @needs_oasdiff
 @pytest.mark.parametrize("overlay_path", sorted((REPO / "apis").glob("*/overlays/*.yaml")), ids=lambda p: f"{p.parent.parent.name}/{p.stem}")
-def test_every_overlay_produces_exactly_its_change_type(tmp_path, monkeypatch, overlay_path: Path):
-    monkeypatch.setenv("BENCH_BUILD_DIR", str(tmp_path))
-    bench = Bench(REPO)
-    api = bench.api(overlay_path.parent.parent.name)
-    result = build(bench, api.name, "99.0.0", overlay_ids=(overlay_path.stem,))
-    diff = diffcheck(api.base_spec_path, result.spec_path, list(result.change_types), bench.catalog)
+def test_every_overlay_produces_exactly_its_change_type(tmp_path, repo_bench, overlay_path: Path):
+    diff = diffcheck_overlay(repo_bench, overlay_path.parent.parent.name, overlay_path.stem, tmp_path)
     assert diff.ok, diff.report()
 
 

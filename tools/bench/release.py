@@ -190,7 +190,7 @@ def release_version(
     token = github_token()
 
     b, diff = build_and_diffcheck(bench, api, version)
-    apimatic.validate(b.project_dir, key)
+    apimatic.validate(b.project_dir, key, api.validate_fails_on)
 
     if opts.dry_run:
         apimatic.sdk_publish(

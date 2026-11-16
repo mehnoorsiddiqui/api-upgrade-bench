@@ -47,16 +47,45 @@ def spec_bytes(spec: dict) -> bytes:
     return (json.dumps(spec, indent=2, ensure_ascii=False) + "\n").encode("utf-8")
 
 
+BUILT_CACHE_SIZE = 8
+
+
+def _applied(bench: Bench, api: Api, overlay_ids: tuple[str, ...]) -> dict:
+    """The base with `overlay_ids` applied, starting from the longest prefix already built.
+
+    Imported version histories share long prefixes (every version of a real API's history starts
+    with all earlier steps), so this keeps building and checking them linear rather than quadratic.
+    Results are shared between calls: callers must not modify them."""
+    cache = bench._built_cache
+    key = (api.name, overlay_ids)
+    if key in cache:
+        cache[key] = cache.pop(key)  # most recently used
+        return cache[key]
+    start, done = bench.base_spec(api), 0
+    for n in range(len(overlay_ids) - 1, 0, -1):
+        hit = cache.get((api.name, overlay_ids[:n]))
+        if hit is not None:
+            start, done = hit, n
+            break
+    rest = [(f"overlays/{oid}.yaml", bench.overlay(api, oid).doc) for oid in overlay_ids[done:]]
+    spec = apply_overlays(start, rest)  # copies `start`
+    cache[key] = spec
+    while len(cache) > BUILT_CACHE_SIZE:
+        cache.pop(next(iter(cache)))
+    return spec
+
+
 def build_spec(bench: Bench, api: Api, version: str, overlay_ids: tuple[str, ...] | None = None) -> dict:
     parse_semver(version)
     if overlay_ids is None:
         overlay_ids = bench.releases(api).overlays_for(version)
-    overlays = [(f"overlays/{oid}.yaml", bench.overlay(api, oid).doc) for oid in overlay_ids]
     try:
-        spec = apply_overlays(bench.base_spec(api), overlays)
+        applied = _applied(bench, api, tuple(overlay_ids))
     except OverlayError as exc:
         raise BenchError(f"apis/{api.name} {version}: {exc}") from exc
-    spec.setdefault("info", {})["version"] = version
+    # a shallow copy with its own `info`: the applied document is shared through the cache
+    spec = dict(applied)
+    spec["info"] = {**(applied.get("info") or {}), "version": version}
     return spec
 
 

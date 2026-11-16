@@ -99,7 +99,7 @@ def world(mini_repo, tmp_path, monkeypatch):
     ap = release_mod.apimatic
     monkeypatch.setattr(ap, "cli_version", lambda: "2.2.0")
     monkeypatch.setattr(ap, "login", lambda key: w.calls.append("login"))
-    monkeypatch.setattr(ap, "validate", lambda project_dir, key: w.calls.append("validate"))
+    monkeypatch.setattr(ap, "validate", lambda project_dir, key, fails_on="errors": w.calls.append("validate"))
     monkeypatch.setattr(ap, "sdk_publish", w.sdk_publish)
     monkeypatch.setattr(ap, "plugin_generate", w.plugin_generate)
     monkeypatch.setattr(release_mod, "has_version", lambda pkg, v: v in w.nuget)
