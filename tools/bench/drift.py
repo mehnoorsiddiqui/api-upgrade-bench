@@ -19,7 +19,10 @@ from .build import build
 from .config import Api, Bench
 from .proc import remote_tag_commit, repo_url, run
 
-ALWAYS_IGNORED = (".git", ".git/**")
+# .git, and the CLI's own bookkeeping (.apimatic/generation.json etc.), which a dry run writes into
+# the SDK dir but `sdk publish` never uploads.
+ALWAYS_IGNORED = (".git/**", ".apimatic/**")
+TOP_LEVEL_IGNORED = {".git", ".apimatic"}
 
 
 @dataclass
@@ -39,7 +42,7 @@ def _files(root: Path, ignore: tuple[str, ...]) -> dict[str, Path]:
         if not path.is_file():
             continue
         rel = path.relative_to(root).as_posix()
-        if rel.split("/", 1)[0] == ".git" or any(fnmatch.fnmatch(rel, g) for g in ignore):
+        if rel.split("/", 1)[0] in TOP_LEVEL_IGNORED or any(fnmatch.fnmatch(rel, g) for g in ignore):
             continue
         found[rel] = path
     return found
