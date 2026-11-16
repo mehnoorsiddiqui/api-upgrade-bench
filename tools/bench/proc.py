@@ -5,6 +5,7 @@ from __future__ import annotations
 import os
 import shutil
 import subprocess
+import time
 from pathlib import Path
 from typing import Sequence
 
@@ -100,6 +101,25 @@ def remote_branch_commit(repo: str, branch: str, token: str | None = None) -> st
         if ref == f"refs/heads/{branch}":
             return sha
     return None
+
+
+def dispatch_workflow(repo: str, workflow: str, ref: str, inputs: dict[str, str], token: str | None) -> None:
+    """Start a workflow_dispatch run (the token needs Actions: write on the repo)."""
+    args = ["gh", "workflow", "run", workflow, "-R", repo, "--ref", ref]
+    for key, value in inputs.items():
+        args += ["-f", f"{key}={value}"]
+    run(args, env={"GH_TOKEN": token} if token else None, capture=True)
+
+
+def wait_for_tag(repo: str, tag: str, token: str | None, timeout_s: int = 600, interval_s: int = 15) -> str | None:
+    """The tag's commit once it exists, or None after the timeout."""
+    deadline = time.monotonic() + timeout_s
+    while True:
+        commit = remote_tag_commit(repo, tag, token)
+        if commit or time.monotonic() >= deadline:
+            return commit
+        print(f"waiting for {repo} to get tag {tag} ...", flush=True)
+        time.sleep(interval_s)
 
 
 def create_remote_tag(repo: str, tag: str, sha: str, token: str | None) -> None:

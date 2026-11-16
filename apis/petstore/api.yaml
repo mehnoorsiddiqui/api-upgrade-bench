@@ -1,12 +1,25 @@
 # yaml-language-server: $schema=../../schemas/api.schema.json
 name: petstore
-# From `apimatic publishing profile list` once the "bench-petstore" profile exists (README, one-time setup).
+# TEMPORARY: uses the existing petstore SDK package and plugin (SwaggerPetstoreOpenApi310,
+# petstore-sdk-csharp, petstore-context-plugin) instead of fresh bench-only ones. To move to the
+# bench-only setup later: ApimaticBench.Petstore, bench-petstore-sdk-csharp,
+# bench-petstore-context-plugin, plugin bench-petstore / "Bench Petstore", base 1.0.0, empty lock.
+#
+# From `apimatic publishing profile list`: the profile that publishes SwaggerPetstoreOpenApi310
+# to NuGet and the source to petstore-sdk-csharp.
 profile_id: null
-nuget_package_id: ApimaticBench.Petstore
-sdk_repo: mehnoorsiddiqui/bench-petstore-sdk-csharp
-plugin_repo: mehnoorsiddiqui/bench-petstore-context-plugin
-plugin_id: bench-petstore
-plugin_name: Bench Petstore
-# Paths (globs, relative to the SDK root) the generator-drift check ignores. Tune after the spike
-# if source publishing adds files that `sdk publish --dry-run` does not produce.
-drift_ignore: []
+nuget_package_id: SwaggerPetstoreOpenApi310
+sdk_repo: mehnoorsiddiqui/petstore-sdk-csharp
+plugin_repo: mehnoorsiddiqui/petstore-context-plugin
+plugin_id: petstore-plugin
+plugin_name: Pet Store Plugin
+# NuGet is published by the SDK repo's own workflow (.github/workflows/publish-nuget.yml, NuGet
+# trusted publishing), not by the APIMatic profile: bench runs `sdk publish --publish-type sourcecode`,
+# then dispatches that workflow with `version`, waits for NuGet, and uses the tag the workflow creates.
+nuget_publisher: sdk-repo-workflow
+nuget_workflow: publish-nuget.yml
+# Paths (globs, relative to the SDK root) the generator-drift check ignores: files added to the
+# SDK repo by hand (its own NuGet workflow), which `sdk publish --dry-run` never produces.
+drift_ignore:
+  - .github/workflows/publish-nuget.yml
+  - .github/nuget/**

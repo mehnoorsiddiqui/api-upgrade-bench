@@ -30,7 +30,15 @@ from .drift import DriftResult, check_drift
 from .lock import append_entry, commit_lock, load_lock, make_entry, pending_versions
 from .nuget_wait import has_version, wait_for_version
 from .plugin_push import push_plugin
-from .proc import create_remote_tag, github_token, remote_branch_commit, remote_tag_commit, run
+from .proc import (
+    create_remote_tag,
+    dispatch_workflow,
+    github_token,
+    remote_branch_commit,
+    remote_tag_commit,
+    run,
+    wait_for_tag,
+)
 from .validate import require_valid
 
 
@@ -98,8 +106,15 @@ def _publish_sdk(
                 f"(gh api -X POST repos/{api.sdk_repo}/git/refs -f ref=refs/tags/{tag} -f sha=<commit>) and re-run."
             )
     else:
-        apimatic.sdk_publish(b.project_dir, sdk_dir, profile_id, version)
+        by_workflow = api.nuget_publisher == "sdk-repo-workflow"
+        apimatic.sdk_publish(b.project_dir, sdk_dir, profile_id, version, publish_types=api.publish_types)
         record = apimatic.publish_record(b.project_dir) or {}
+        if by_workflow:
+            # A source-only publish records no package version; the SDK repo's workflow publishes it.
+            # Record it ourselves so `plugin generate` sees the version that is about to be on NuGet.
+            record.setdefault("packageConfiguration", {}).setdefault("packageId", api.nuget_package_id)
+            record["package"] = {"version": version}
+            apimatic.write_publish_record(b.project_dir, record)
         published_version = (record.get("package") or {}).get("version")
         if published_version != version:
             raise BenchError(
@@ -116,7 +131,14 @@ def _publish_sdk(
                 f"the publishing profile published package {package_id!r}, but api.yaml says {api.nuget_package_id!r}"
             )
         record_kind = "published"
-        sdk_commit = remote_tag_commit(api.sdk_repo, tag, token)
+        if by_workflow:
+            # The workflow builds the commit APIMatic just pushed, publishes `version`, then tags it.
+            dispatch_workflow(api.sdk_repo, api.nuget_workflow, api.sdk_branch, {"version": version}, token)
+            wait_for_version(api.nuget_package_id, version, timeout_s=nuget_timeout_s)
+            on_nuget = True
+            sdk_commit = wait_for_tag(api.sdk_repo, tag, token, timeout_s=600)
+        else:
+            sdk_commit = remote_tag_commit(api.sdk_repo, tag, token)
         if not sdk_commit:
             branch = (record.get("source") or {}).get("branch") or api.sdk_branch
             head = remote_branch_commit(api.sdk_repo, branch, token)
@@ -171,7 +193,10 @@ def release_version(
     apimatic.validate(b.project_dir, key)
 
     if opts.dry_run:
-        apimatic.sdk_publish(b.project_dir, b.project_dir / "sdk" / "csharp", api.profile_id, version, dry_run=True)
+        apimatic.sdk_publish(
+            b.project_dir, b.project_dir / "sdk" / "csharp", api.profile_id, version,
+            dry_run=True, publish_types=api.publish_types,
+        )
         print(f"dry run: {api.name} {version} built, checked and generated; nothing published", flush=True)
         return
 

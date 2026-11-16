@@ -121,6 +121,15 @@ class Api:
     sdk_branch: str = "main"
     plugin_branch: str = "main"
     drift_ignore: tuple[str, ...] = ()
+    # Who pushes the NuGet package: the APIMatic publishing profile (default), or a workflow in the
+    # SDK repo that bench dispatches with the version after APIMatic publishes the source.
+    nuget_publisher: str = "apimatic"
+    nuget_workflow: str = "publish-nuget.yml"
+
+    @property
+    def publish_types(self) -> tuple[str, ...]:
+        """What `apimatic sdk publish` publishes for this API."""
+        return ("sourcecode",) if self.nuget_publisher == "sdk-repo-workflow" else ("package", "sourcecode")
 
     @property
     def base_spec_path(self) -> Path:
@@ -129,6 +138,11 @@ class Api:
     @property
     def meta_path(self) -> Path:
         return self.dir / "spec" / "APIMATIC-META.json"
+
+    @property
+    def config_template_path(self) -> Path:
+        """Optional `apimatic.json` template; `bench build` fills in `plugin` and `languages` per version."""
+        return self.dir / "apimatic.json"
 
     @property
     def overlays_dir(self) -> Path:
@@ -245,6 +259,8 @@ class Bench:
                 sdk_branch=data.get("sdk_branch", "main"),
                 plugin_branch=data.get("plugin_branch", "main"),
                 drift_ignore=tuple(data.get("drift_ignore") or ()),
+                nuget_publisher=data.get("nuget_publisher", "apimatic"),
+                nuget_workflow=data.get("nuget_workflow", "publish-nuget.yml"),
             )
         except KeyError as exc:
             raise BenchError(f"apis/{name}/api.yaml: missing {exc.args[0]!r}") from exc

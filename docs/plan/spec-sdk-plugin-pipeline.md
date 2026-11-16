@@ -32,7 +32,7 @@ catalog/change-types.yaml        # id, category, breaking, description, expected
 apis/<api>/
   api.yaml                       # profile_id, nuget_package_id, sdk_repo, plugin_repo, plugin_id, plugin_name
   spec/openapi.yaml              # base (v1.0.0)
-  spec/APIMATIC-META.json        # codegen settings (C# namespace/project name) – copied from current petstore build
+  spec/APIMATIC-META.json        # optional, import/merge/validation settings only: Codegen v4 ignores CodeGenSettings (SDK name comes from info.title)
   overlays/<change-id>.yaml      # OpenAPI Overlay 1.0 + x-change {type, breaking, targets}
   releases.yaml                  # version -> [overlay ids]  (hand-edited)
   releases.lock.yaml             # written by CI only
@@ -52,7 +52,7 @@ tests/                           # pytest for overlay apply, catalog/release val
 ## Tools (Python, in `tools/bench/`)
 
 1. `overlay.py` – apply Overlay 1.0 `update`/`remove` actions with `jsonpath-ng`; refuse targets that match nothing.
-2. `build.py <api> <version>` – write a fresh `build/<api>/<version>/src/` containing `spec/openapi.json` (base + overlays, `info.version` = version), `spec/APIMATIC-META.json`, and `apimatic.json`:
+2. `build.py <api> <version>` – write a fresh `build/<api>/<version>/src/` containing `spec/openapi.json` (base + overlays, `info.version` = version), `spec/APIMATIC-META.json` if the API has one, and `apimatic.json`:
    `{"schemaVersion":1, "plugin":{"pluginId", "pluginName", "pluginVersion":<version>, "license":"MIT"}, "languages":{"csharp":{}}}` → plugin version is in lockstep with the SDK version (matches dep-agent `stamp_field: version`).
 3. `diffcheck.py` – run pinned `oasdiff breaking` base vs built spec; compare detected check ids with the catalog's expected ids for the declared types; fail on unlabelled or missing changes.
 4. `release.py <api> <version>` – the sequence in the next section; idempotent: skips a step whose output already exists (NuGet version present, tag present) so a re-run after a partial failure completes instead of re-publishing.
@@ -81,11 +81,11 @@ tests/                           # pytest for overlay apply, catalog/release val
 1. Create empty GitHub repos `bench-<api>-sdk-csharp` and `bench-<api>-context-plugin`.
 2. In app.apimatic.io Publishing Center: add NuGet API-key credential (scoped to `ApimaticBench.*` push) and GitHub credential; create profile "bench-<api>" with C# enabled, package id `ApimaticBench.<Api>`, source repo `bench-<api>-sdk-csharp`, branch `main`.
 3. `apimatic publishing profile list` → copy the id into `apis/<api>/api.yaml`.
-4. Add `apis/<api>/spec/openapi.yaml` + `APIMATIC-META.json`, `releases.yaml` with only `base: 1.0.0` → merge → 1.0.0 published.
+4. Add `apis/<api>/spec/openapi.yaml`, `releases.yaml` with only `base: 1.0.0` → merge → 1.0.0 published.
 
 ## Implementation order
 
-0. **Spike (manual, petstore, before writing tools):** run steps 2–8 by hand with version 1.0.0 against the fresh profile; confirm: SDK repo tag/branch behaviour, `apimatic.json` publishing record, that `plugin generate` runs non-interactively with the pre-written `plugin` block, plugin `version` field, C# namespace from `APIMATIC-META.json`. Adjust this plan's facts if any differ.
+0. **Spike (manual, petstore, before writing tools):** run steps 2–8 by hand with version 1.0.0 against the fresh profile; confirm: SDK repo tag/branch behaviour, `apimatic.json` publishing record, that `plugin generate` runs non-interactively with the pre-written `plugin` block, plugin `version` field, C# namespace from the spec's `info.title`. Adjust this plan's facts if any differ.
 1. Repo scaffold, catalog with ~6 change types (rename-operation, rename-parameter, add-required-parameter, rename-model-property, change-property-type, auth-scheme-change), overlay applier + tests.
 2. build + diffcheck + validate.yml.
 3. release.py + release.yml; publish petstore 1.0.0, then 2.0.0 (one overlay).

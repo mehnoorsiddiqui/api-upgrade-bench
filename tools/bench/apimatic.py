@@ -51,7 +51,15 @@ def sdk_generate(project_dir: Path, destination: Path, key: str | None) -> None:
     run([exe(), "sdk", "generate", "-i", project_dir, "-d", destination, "--language", "csharp", "--force", *_auth(key)])
 
 
-def sdk_publish(project_dir: Path, destination: Path, profile_id: str, version: str, *, dry_run: bool = False) -> None:
+def sdk_publish(
+    project_dir: Path,
+    destination: Path,
+    profile_id: str,
+    version: str,
+    *,
+    dry_run: bool = False,
+    publish_types: tuple[str, ...] = ("package", "sourcecode"),
+) -> None:
     args = [
         exe(), "sdk", "publish",
         "-i", project_dir,
@@ -59,8 +67,7 @@ def sdk_publish(project_dir: Path, destination: Path, profile_id: str, version: 
         "--profile-id", profile_id,
         "--language", "csharp",
         "--version", version,
-        "--publish-type", "package",
-        "--publish-type", "sourcecode",
+        *[arg for kind in publish_types for arg in ("--publish-type", kind)],
         "--force",
     ]
     if dry_run:

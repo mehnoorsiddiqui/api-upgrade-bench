@@ -1,0 +1,20 @@
+{
+  "$schema": "https://cdn.jsdelivr.net/npm/@apimatic/cli@2/apimatic.schema.json",
+  "schemaVersion": 1,
+  "portal": {
+    "site": {
+      "name": "Swagger Petstore - OpenAPI 3.1.0",
+      "description": "This is a sample Pet Store Server based on the OpenAPI 3.1.0 specification. You can find out more about Swagger at [https://swagger.io](https://swagger.io). In the third iteration of the pet store, we've switched to the design first approach! You can now help us improve the API whether it's by"
+    },
+    "brand": {
+      "colors": {},
+      "colorMode": "both"
+    },
+    "navigation": {
+      "links": []
+    },
+    "ai": {
+      "pageActions": true
+    }
+  }
+}

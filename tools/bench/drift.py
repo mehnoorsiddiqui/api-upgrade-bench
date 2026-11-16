@@ -67,7 +67,7 @@ def check_drift(bench: Bench, api: Api, *, profile_id: str, token: str | None) -
 
     project = build(bench, api.name, base, project_dir=bench.build_dir / api.name / "_drift" / base)
     regenerated = project.project_dir / "sdk" / "csharp"
-    apimatic.sdk_publish(project.project_dir, regenerated, profile_id, base, dry_run=True)
+    apimatic.sdk_publish(project.project_dir, regenerated, profile_id, base, dry_run=True, publish_types=api.publish_types)
 
     with tempfile.TemporaryDirectory() as tmp:
         published = Path(tmp) / "published"

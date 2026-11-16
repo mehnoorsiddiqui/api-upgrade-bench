@@ -17,6 +17,15 @@
     "plugin_branch": { "type": "string", "minLength": 1 },
     "plugin_id": { "type": "string", "pattern": "^[a-z0-9]+(-[a-z0-9]+)*$" },
     "plugin_name": { "type": "string", "pattern": "[A-Za-z0-9]" },
+    "nuget_publisher": {
+      "description": "apimatic: the publishing profile pushes the NuGet package. sdk-repo-workflow: APIMatic publishes the source only, then bench dispatches nuget_workflow in the SDK repo with the version.",
+      "enum": ["apimatic", "sdk-repo-workflow"]
+    },
+    "nuget_workflow": {
+      "description": "With nuget_publisher sdk-repo-workflow: the workflow file in the SDK repo; it must take a 'version' workflow_dispatch input.",
+      "type": "string",
+      "minLength": 1
+    },
     "drift_ignore": {
       "description": "Globs (relative to the SDK root) left out of the generator-drift comparison.",
       "type": "array",

@@ -16,8 +16,10 @@ catalog/change-types.yaml        change types: id, category, breaking, expected 
 schemas/*.schema.json            JSON Schemas for api.yaml, overlays, releases.yaml, the catalog
 apis/<api>/
   api.yaml                       profile_id, nuget_package_id, sdk_repo, plugin_repo, plugin_id, plugin_name
-  spec/openapi.yaml              the base spec (version 1.0.0)
-  spec/APIMATIC-META.json        codegen settings (CodeGenSettings.ProjectName sets the C# project/namespace)
+  apimatic.json                  optional template for src/apimatic.json (portal settings, plugin author/license);
+                                 bench sets plugin id/name/version and `languages` for each version
+  spec/openapi.yaml              the base spec (version 1.0.0); info.title names the SDK project/namespace
+  spec/APIMATIC-META.json        optional: import/merge/validation settings only (Codegen v4 ignores CodeGenSettings)
   overlays/<change-id>.yaml      OpenAPI Overlay 1.0 + x-change {type, breaking, targets}
   releases.yaml                  version -> [overlay ids]   (edited by hand)
   releases.lock.yaml             what was published         (written by CI only)
@@ -86,8 +88,10 @@ unlabelled change) or when a declared type's required checks are not detected (a
 
 ### Add an API
 
-1. Add `apis/<api>/` with `api.yaml` (`profile_id: null` for now), `spec/openapi.yaml`,
-   `spec/APIMATIC-META.json`, and `releases.yaml` with only `base: 1.0.0`.
+1. Add `apis/<api>/` with `api.yaml` (`profile_id: null` for now), `spec/openapi.yaml`, and
+   `releases.yaml` with only `base: 1.0.0`. Optionally add `apimatic.json` for settings such as
+   `portal`; leave out `plugin.pluginVersion` and `languages.*.publishing`: `bench build` writes those
+   for every version (and `bench validate` rejects a copied publishing record).
 2. Do the one-time setup below, then put the profile id in `api.yaml` and merge: `1.0.0` is published.
 
 An API whose `profile_id` is still `null` is validated but never released.
@@ -107,6 +111,11 @@ For the repo (once):
 - Secrets: `APIMATIC_API_KEY`; `PLUGIN_PUSH_TOKEN`, a fine-grained PAT with contents:write on the
   `bench-*-context-plugin` repos (push + tag) and the `bench-*-sdk-csharp` repos (tag fallback, drift clone).
   NuGet and SDK-repo GitHub credentials stay inside the APIMatic publishing profile.
+- An API with `nuget_publisher: sdk-repo-workflow` (petstore, for now) leaves NuGet to a workflow in
+  its SDK repo: APIMatic publishes the source only, then bench runs that workflow with
+  `-f version=<version>`, waits for NuGet and takes the tag the workflow creates. The PAT then also
+  needs **Actions: read and write** on that SDK repo, and the workflow must not also run on `push`
+  (otherwise APIMatic's push publishes a second, auto-numbered version).
 - `release.yml` commits `releases.lock.yaml` to `main` with `GITHUB_TOKEN`; if `main` is protected,
   allow GitHub Actions to push to it.
 
@@ -169,7 +178,7 @@ profile, with version `1.0.0`:
 - [ ] `apimatic plugin generate` runs non-interactively with the pre-written `plugin` block and
       writes `.claude-plugin/plugin.json` with `"version": "1.0.0"` and `"name": "bench-petstore"`
       (dep-agent matches `plugin:` against `name`; `bench export-dep-agent` assumes it is `plugin_id`).
-- [ ] the C# project/namespace comes from `CodeGenSettings.ProjectName` (`BenchPetstore`).
+- [ ] the C# project/namespace comes from the spec's `info.title` (expected `SwaggerPetstoreOpenApi310`).
 - [ ] `sdk publish --dry-run` output equals the published `v1.0.0` tree; any files source
       publishing adds go into `drift_ignore` in `api.yaml`.
 

@@ -31,7 +31,7 @@ def test_build_writes_an_apimatic_project(mini_repo):
     spec = json.loads((src / "spec" / "openapi.json").read_text())
     assert spec["info"]["version"] == "2.0.0"
     assert spec["paths"]["/things/{id}"]["get"]["operationId"] == "fetchThing"
-    assert (src / "spec" / "APIMATIC-META.json").read_text().startswith('{"CodeGenSettings"')
+    assert not (src / "spec" / "APIMATIC-META.json").exists()  # optional, and the mini API has none
     config = json.loads((src / "apimatic.json").read_text())
     assert config == {
         "schemaVersion": 1,
@@ -128,13 +128,13 @@ def test_export_dep_agent(mini_repo):
 
 
 def test_apimatic_json_matches_the_cli_schema(mini_repo):
-    """tests/fixtures/apimatic.schema.json is a copy of @apimatic/cli@2's apimatic.schema.json."""
+    """schemas/apimatic.schema.json is a copy of @apimatic/cli@2's apimatic.schema.json."""
     from jsonschema import Draft7Validator
 
     from bench import apimatic
-    from conftest import FIXTURES
+    from conftest import REPO
 
-    validator = Draft7Validator(json.loads((FIXTURES / "apimatic.schema.json").read_text(encoding="utf-8")))
+    validator = Draft7Validator(json.loads((REPO / "schemas" / "apimatic.schema.json").read_text(encoding="utf-8")))
     result = build(mini_repo, "mini", "2.0.0")
     assert list(validator.iter_errors(json.loads(result.apimatic_json.read_text()))) == []
 
@@ -144,3 +144,52 @@ def test_apimatic_json_matches_the_cli_schema(mini_repo):
     config = json.loads(result.apimatic_json.read_text())
     assert list(validator.iter_errors(config)) == []
     assert apimatic.publish_record(result.project_dir)["package"]["version"] == "2.0.0"
+
+
+def test_metadata_file_is_copied_when_present(mini_repo):
+    meta = mini_repo.root / "apis" / "mini" / "spec" / "APIMATIC-META.json"
+    meta.write_text('{"ImportSettings": {"ImportAdditionalHeader": false}}\n', encoding="utf-8")
+    result = build(mini_repo, "mini", "1.0.0")
+    assert (result.project_dir / "src" / "spec" / "APIMATIC-META.json").read_text() == meta.read_text()
+
+
+def _template(mini_repo, data):
+    (mini_repo.root / "apis" / "mini" / "apimatic.json").write_text(json.dumps(data), encoding="utf-8")
+
+
+def test_apimatic_json_template_is_kept_and_per_version_parts_are_set(mini_repo):
+    portal = {"site": {"name": "Mini"}, "ai": {"pageActions": False}}
+    _template(mini_repo, {"$schema": "x", "schemaVersion": 1, "portal": portal,
+                          "plugin": {"author": {"name": "Bench"}, "license": "Apache-2.0"}})
+    config = json.loads(build(mini_repo, "mini", "2.0.0").apimatic_json.read_text())
+    assert config["$schema"] == "x" and config["portal"] == portal
+    assert config["plugin"] == {
+        "author": {"name": "Bench"},
+        "license": "Apache-2.0",
+        "pluginId": "bench-mini",
+        "pluginName": "Bench Mini",
+        "pluginVersion": "2.0.0",
+    }
+    assert config["languages"] == {"csharp": {}}
+
+
+def test_apimatic_json_template_rules(mini_repo):
+    from bench.config import Bench
+    from bench.validate import validate_all
+
+    _template(mini_repo, {"schemaVersion": 1, "portal": {"site": {"name": "Mini"}}})
+    assert validate_all(Bench(mini_repo.root)).errors == []
+
+    _template(mini_repo, {
+        "schemaVersion": 1,
+        "plugin": {"pluginId": "other", "pluginName": "Bench Mini", "pluginVersion": "9.9.9"},
+        "languages": {"csharp": {"publishing": {"package": {"version": "1.0.2"}}}, "python": {}},
+    })
+    problems = validate_all(Bench(mini_repo.root))
+    assert any("plugin.pluginId is 'other'" in e for e in problems.errors)
+    assert any("languages.csharp.publishing must not be in the template" in e for e in problems.errors)
+    assert any("languages.python" in e for e in problems.errors)
+    assert any("pluginVersion is ignored" in w for w in problems.warnings)
+
+    _template(mini_repo, {"schemaVersion": 1, "portal": {"brand": {"colorMode": "purple"}}})
+    assert any("apimatic.schema.json" in e for e in validate_all(Bench(mini_repo.root)).errors)
