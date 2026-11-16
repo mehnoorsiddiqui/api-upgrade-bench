@@ -22,3 +22,28 @@ releases:
     publish_record: published
     published_at: '2026-11-16T10:53:06Z'
     workflow_run_url: https://github.com/mehnoorsiddiqui/api-upgrade-bench/actions/runs/43852534548
+  2.0.0:
+    overlays:
+    - rename-status-param
+    spec_sha256: ff4f6cd019c2e3ff3115719012741f3c24fd5bc89d78dd454fac8ce52d75ce1b
+    change_types:
+    - rename-parameter
+    oasdiff_checks:
+    - new-optional-request-parameter
+    - request-parameter-removed
+    cli_version: 2.2.0
+    sdk:
+      package_id: ApimaticBench.Petstore
+      version: 2.0.0
+      repo: mehnoorsiddiqui/apimatic-bench-petstore-dotnet-sdk
+      tag: v2.0.0
+      commit: d64546d80ad7f2d768ecd253472013b43c7553d8
+    plugin:
+      repo: mehnoorsiddiqui/bench-petstore-context-plugin
+      tag: v2.0.0
+      commit: ca65c4c4f5e8dd36eac5457af0541d88ad754f7a
+      version: 2.0.0
+    generator_drift: false
+    publish_record: published
+    published_at: '2026-11-16T11:09:40Z'
+    workflow_run_url: https://github.com/mehnoorsiddiqui/api-upgrade-bench/actions/runs/43852534548
