@@ -177,6 +177,19 @@ def test_rerun_after_partial_failure_completes_without_republishing(mini_repo, w
 
 
 @needs_oasdiff
+def test_package_published_but_source_failed_publishes_source_only(mini_repo, world):
+    world.nuget.add("1.0.0")  # an earlier run: APIMatic reported Package Published, Source Code Failed
+    assert release_api(mini_repo, "mini", ReleaseOptions()) == ["1.0.0", "2.0.0"]
+    assert world.publish_types[0] == ("sourcecode",)  # NuGet versions are permanent: no second package push
+    assert world.publish_types[-1] == ("package", "sourcecode")  # 2.0.0 is published normally
+    assert tags(world, "owner/bench-mini-sdk-csharp") == ["v1.0.0", "v2.0.0"]
+    lock = load_lock(mini_repo.api("mini"))
+    assert lock["1.0.0"]["publish_record"] == "published"
+    assert lock["1.0.0"]["sdk"]["commit"] == git("rev-parse", "v1.0.0^{commit}", cwd=world.bare("owner/bench-mini-sdk-csharp"))
+    assert "plugin_generate 1.0.0" in world.calls
+
+
+@needs_oasdiff
 def test_generator_drift_stops_the_release(mini_repo, world, monkeypatch):
     release_api(mini_repo, "mini", ReleaseOptions(version="1.0.0"))
     original = world.generated_files
