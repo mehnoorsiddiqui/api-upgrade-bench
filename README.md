@@ -30,11 +30,9 @@ tests/                           pytest
 .github/workflows/               validate.yml (PRs), release.yml (main + manual)
 ```
 
-APIs today: `petstore` (the Swagger Petstore 3.0 build used so far, renamed `ApimaticBench.Petstore`)
-and `taskboard` (an invented API, to show that adding an API is adding a folder). Petstore has one
-example overlay per change type, taskboard three; neither declares releases beyond the base yet.
-`square` is Square's real release history from 2024-04-17 to 2026-09-16, imported as described in
-[Imported histories](#imported-histories-square).
+APIs today: `petstore` (the Swagger Petstore 3.0 build used so far, renamed `ApimaticBench.Petstore`),
+with one example overlay per change type, and `square`, Square's real release history from 2024-04-17
+to 2026-09-16, imported as described in [Imported histories](#imported-histories-square).
 
 ## Using it
 
