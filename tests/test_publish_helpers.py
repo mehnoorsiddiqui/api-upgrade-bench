@@ -85,6 +85,9 @@ def test_compare_trees(tmp_path):
     (a / "only-new.txt").write_text("x")
     (b / "only-old.txt").write_text("x")
     (b / "ignored.md").write_text("x")
+    (a / ".apimatic").mkdir()  # CLI bookkeeping a dry run writes; never published
+    (a / ".apimatic" / "generation.json").write_text("{}")
+    (a / ".apimatic" / ".gitattributes").write_text("x")
     diffs = compare_trees(a, b, ignore=("ignored.md",))
     assert diffs == [
         "only in regenerated SDK: only-new.txt",
