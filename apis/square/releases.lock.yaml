@@ -1,0 +1,26 @@
+# Written by CI (`bench release`). Do not edit by hand.
+# One entry per published version: what it contains and where it was published.
+#
+# 1.0.0 is `adopted` history, not a release of this API any more: it was published by hand (NuGet
+# through the SDK repo's own workflow, assembly Square.dll) before the `square-api` profile existed.
+# The base is 1.0.1, the same S0 spec published through the profile like every later version, so
+# all versions are packaged the same way. 1.0.0 stays on nuget.org (versions cannot be deleted).
+releases:
+  1.0.0:
+    adopted: true
+    note: Superseded by the base 1.0.1 (same S0 spec, published through the profile). Not declared in releases.yaml.
+    overlays: []
+    spec_sha256: null
+    change_types: []
+    sdk:
+      package_id: ApimaticBench.Square
+      version: 1.0.0
+      repo: mehnoorsiddiqui/bench-square-sdk-csharp
+      tag: v1.0.0
+      commit: b658d4b71b9b3f0bfb2decd1bcbe53bbae0a60ee
+    plugin:
+      repo: mehnoorsiddiqui/bench-square-context-plugin
+      tag: v1.0.0
+      commit: b57caa96717b9c89ac2b8a820844e8b9422cc752
+      version: 1.0.0
+    generator_drift: false

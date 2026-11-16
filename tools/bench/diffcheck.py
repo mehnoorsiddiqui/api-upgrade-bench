@@ -98,3 +98,19 @@ def evaluate(changes: list[dict], declared_types: list[str], catalog: Catalog) -
 
 def diffcheck(base: Path, revision: Path, declared_types: list[str], catalog: Catalog) -> DiffResult:
     return evaluate(run_oasdiff(base, revision), declared_types, catalog)
+
+
+def diffcheck_overlay(bench, api_name: str, overlay_id: str, work_dir: Path) -> DiffResult:
+    """One overlay against what it applies to: the base plus the overlays it requires (just the
+    base for an overlay that requires nothing). The diff must be exactly the overlay's type."""
+    from .build import build  # build imports config; keep this module importable on its own
+
+    api = bench.api(api_name)
+    prerequisites = bench.prerequisites(api, overlay_id)
+    if prerequisites:
+        before = build(bench, api_name, "0.0.0", overlay_ids=prerequisites, project_dir=work_dir / "before").spec_path
+    else:
+        before = api.base_spec_path
+    after = build(bench, api_name, "0.0.0", overlay_ids=prerequisites + (overlay_id,), project_dir=work_dir / "after")
+    return diffcheck(before, after.spec_path, [bench.overlay(api, overlay_id).type], bench.catalog)
+

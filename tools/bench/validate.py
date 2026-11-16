@@ -3,7 +3,8 @@
 Release rules (releases.yaml):
 * versions are MAJOR.MINOR.PATCH, unique, and greater than the base;
 * the base carries no overlays (it is not listed under `releases`);
-* every overlay a release names exists and applies cleanly to the base;
+* every overlay a release names exists and applies cleanly to the base, after the overlays it
+  requires (`x-change.requires`), which the release must list before it;
 * a release containing a breaking change has a greater major than the base;
 * a version in the lock is never removed or edited: it must still be declared with the same
   overlays, and rebuilding it must give the spec hash the lock recorded.
@@ -127,10 +128,12 @@ def validate_api(bench: Bench, name: str, problems: Problems) -> None:
         return
     info_version = str((base_spec.get("info") or {}).get("version", ""))
 
-    # overlays: schema, catalog membership, and each applies on its own to the base
+    # overlays: schema, catalog membership, and each applies to the base on its own, or after
+    # the overlays it requires
     overlay_schema = _schema(bench, "overlay")
     catalog = bench.catalog
     good_overlays: set[str] = set()
+    known_overlays = set(bench.overlay_ids(api))
     for overlay_id in bench.overlay_ids(api):
         rel = f"{where}/overlays/{overlay_id}.yaml"
         doc = load_yaml(api.overlays_dir / f"{overlay_id}.yaml")
@@ -146,10 +149,20 @@ def validate_api(bench: Bench, name: str, problems: Problems) -> None:
                 f"is breaking={catalog.types[overlay.type].breaking} in the catalog"
             )
             continue
+        unknown = [r for r in overlay.requires if r not in known_overlays]
+        if unknown:
+            problems.error(f"{rel}: x-change.requires names unknown overlays: {', '.join(unknown)}")
+            continue
         try:
-            spec_sha256(bench, api, "0.0.0", (overlay_id,))
+            prerequisites = bench.prerequisites(api, overlay_id)
         except BenchError as exc:
-            problems.error(f"{rel}: does not apply to the base spec: {exc}")
+            problems.error(f"{rel}: {exc}")
+            continue
+        try:
+            spec_sha256(bench, api, "0.0.0", prerequisites + (overlay_id,))
+        except BenchError as exc:
+            after = f" after the {len(prerequisites)} overlay(s) it requires" if prerequisites else ""
+            problems.error(f"{rel}: does not apply to the base spec{after}: {exc}")
             continue
         good_overlays.add(overlay_id)
 
@@ -180,13 +193,24 @@ def validate_api(bench: Bench, name: str, problems: Problems) -> None:
         if broken:
             problems.error(f"{rel_where}: {version} uses invalid overlays: {', '.join(broken)}")
             continue
+        position = {o: i for i, o in enumerate(release.overlays)}
+        out_of_order = [
+            f"{o} (needs {r})"
+            for o in release.overlays
+            for r in bench.prerequisites(api, o)
+            if position.get(r, len(release.overlays)) > position[o]
+        ]
+        if out_of_order:
+            problems.error(f"{rel_where}: {version} must list what an overlay requires before it: {'; '.join(out_of_order[:5])}")
+            continue
         breaking = [o for o in release.overlays if bench.overlay(api, o).breaking]
         if breaking and parsed[0] <= base[0]:
             problems.error(
                 f"{rel_where}: {version} contains breaking changes ({', '.join(breaking)}) "
                 f"so its major must be greater than the base's ({base[0]})"
             )
-        types = [bench.overlay(api, o).type for o in release.overlays]
+        # An imported history (overlays with `requires`) has one overlay per type per step by design.
+        types = [bench.overlay(api, o).type for o in release.overlays if not bench.overlay(api, o).requires]
         dupes = sorted({t for t in types if types.count(t) > 1})
         if dupes:
             problems.warn(f"{rel_where}: {version} has more than one overlay of type {', '.join(dupes)}")

@@ -6,6 +6,7 @@ import json
 import os
 import re
 import shutil
+import sys
 from pathlib import Path
 
 from .config import BenchError
@@ -43,8 +44,29 @@ def _auth(key: str | None) -> list[str]:
     return [f"--auth-key={key}"] if key else []
 
 
-def validate(project_dir: Path, key: str | None) -> None:
-    run([exe(), "api", "validate", "-i", project_dir, *_auth(key)])
+ANSI = re.compile(r"\x1b\[[0-9;?]*[A-Za-z]")
+
+
+def validate(project_dir: Path, key: str | None, fails_on: str = "errors") -> None:
+    """`apimatic api validate`. With fails_on="errors" (the default) any error fails, as the CLI's exit
+    code says. With "blocking", only the CLI's *Blocking* section does: a real API's spec can carry
+    errors the generator handles (Square's recursive CatalogObject is a "circular reference" error)."""
+    if fails_on == "errors":
+        run([exe(), "api", "validate", "-i", project_dir, *_auth(key)])
+        return
+    result = run([exe(), "api", "validate", "-i", project_dir, *_auth(key)], check=False, capture=True)
+    text = ANSI.sub("", (result.stdout or "") + (result.stderr or ""))
+    tail = text[-4000:]
+    encoding = getattr(sys.stdout, "encoding", None) or "utf-8"  # the CLI draws boxes; a cp1252 console cannot
+    print(tail.encode(encoding, "replace").decode(encoding), flush=True)
+    if result.returncode == 0:
+        return
+    # fail on a Blocking section, and on any failure that is not a validation report at all
+    # (auth, network): only a report whose worst section is "Errors" is let through
+    if "Blocking" in text or "Errors" not in text:
+        raise BenchError(f"apimatic api validate failed for {project_dir} (see above)")
+    else:
+        print("apimatic api validate reported non-blocking errors; continuing (validate_fails_on: blocking)", flush=True)
 
 
 def sdk_generate(project_dir: Path, destination: Path, key: str | None) -> None:
@@ -107,6 +129,20 @@ def write_publish_record(project_dir: Path, record: dict) -> None:
     _config_path(project_dir).write_text(json.dumps(config, indent=2) + "\n", encoding="utf-8", newline="\n")
 
 
+def pin_source_ref(project_dir: Path, ref: str) -> None:
+    """Point the publishing record's source at `ref` (the version's tag) instead of the profile's branch.
+
+    `plugin generate` tells agents to read the SDK source (and its SDK map) at the recorded branch. The
+    profile records its branch, which moves on with every later release, so a plugin for 1.1.0 would
+    describe whatever the branch holds by then. `git clone --branch` takes a tag too, so the tag pins it.
+    """
+    record = publish_record(project_dir)
+    if not record:
+        raise BenchError(f"{_config_path(project_dir)} has no languages.csharp.publishing record to pin")
+    record.setdefault("source", {})["branch"] = ref
+    write_publish_record(project_dir, record)
+
+
 def reconstructed_record(sdk_repo: str, branch: str, package_id: str, version: str) -> dict:
     return {
         "source": {"repositoryUrl": f"https://github.com/{sdk_repo}", "branch": branch},
@@ -116,7 +152,8 @@ def reconstructed_record(sdk_repo: str, branch: str, package_id: str, version: s
 
 
 def find_solution(sdk_dir: Path) -> Path:
-    for pattern in ("*.slnx", "*.sln"):
+    # some CLI versions write the SDK into a <language> folder under -d
+    for pattern in ("*.slnx", "*.sln", "*/*.slnx", "*/*.sln"):
         found = sorted(sdk_dir.glob(pattern))
         if found:
             return found[0]

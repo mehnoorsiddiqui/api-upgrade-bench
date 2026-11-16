@@ -1,0 +1,18 @@
+# yaml-language-server: $schema=../../schemas/api.schema.json
+name: square
+# Square's real API history, S0 (2024-04-17) to S6 (2026-09-16): spec/openapi.yaml is S0 and each
+# release adds one more step's labelled overlays. Imported by import/import_square.py from the
+# commits in import/snapshots.yaml.
+#
+# From `apimatic publishing profile list`: profile `square-api`, which publishes both the source
+# (bench-square-sdk-csharp, main) and the NuGet package ApimaticBench.Square. Every release publishes
+# the SDK, the package and the context plugin with the same version.
+profile_id: 6afb08a32f09fd9183fc6fbd
+nuget_package_id: ApimaticBench.Square
+sdk_repo: mehnoorsiddiqui/bench-square-sdk-csharp
+plugin_repo: mehnoorsiddiqui/bench-square-context-plugin
+plugin_id: bench-square
+plugin_name: Bench Square
+# Square's spec carries `apimatic api validate` errors the generator handles (CatalogObject is
+# recursive: a "circular reference" error; x- keys in `info`): only blocking problems fail a check.
+validate_fails_on: blocking

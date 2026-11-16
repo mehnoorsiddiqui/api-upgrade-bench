@@ -26,6 +26,10 @@
       "type": "string",
       "minLength": 1
     },
+    "validate_fails_on": {
+      "description": "errors (default): any `apimatic api validate` error fails a check or release. blocking: only blocking problems do, for a real API whose spec carries errors the generator handles.",
+      "enum": ["errors", "blocking"]
+    },
     "drift_ignore": {
       "description": "Globs (relative to the SDK root) left out of the generator-drift comparison.",
       "type": "array",

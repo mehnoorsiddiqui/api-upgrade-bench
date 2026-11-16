@@ -92,23 +92,32 @@ def _apply_action(doc: Any, action: dict, where: str) -> None:
             raise OverlayError(f"{where}: target {target!r} is a scalar; update an object or array instead")
 
 
-def apply_overlay(spec: Any, overlay: dict, name: str = "overlay") -> Any:
-    """Return a new document with ``overlay``'s actions applied to ``spec`` (which is not modified)."""
+def _apply_in_place(doc: Any, overlay: dict, name: str) -> None:
     if not isinstance(overlay, dict) or not str(overlay.get("overlay", "")).startswith("1."):
         raise OverlayError(f"{name}: not an Overlay 1.x document (missing 'overlay: 1.0.0')")
     actions = overlay.get("actions")
     if not isinstance(actions, list) or not actions:
         raise OverlayError(f"{name}: 'actions' must be a non-empty list")
-    doc = copy.deepcopy(spec)
     for i, action in enumerate(actions):
         if not isinstance(action, dict):
             raise OverlayError(f"{name}: actions[{i}] must be an object")
         _apply_action(doc, action, f"{name}: actions[{i}]")
+
+
+def apply_overlay(spec: Any, overlay: dict, name: str = "overlay") -> Any:
+    """Return a new document with ``overlay``'s actions applied to ``spec`` (which is not modified)."""
+    doc = copy.deepcopy(spec)
+    _apply_in_place(doc, overlay, name)
     return doc
 
 
 def apply_overlays(spec: Any, overlays: list[tuple[str, dict]]) -> Any:
-    doc = spec
+    """Return a new document with the overlays applied in order (``spec`` is not modified).
+
+    The document is copied once, not once per overlay: a real API's history can mean dozens of
+    overlays on a multi-megabyte spec. Every action copies the values it inserts, so no overlay's
+    data ends up shared with the result."""
+    doc = copy.deepcopy(spec)
     for name, overlay in overlays:
-        doc = apply_overlay(doc, overlay, name)
+        _apply_in_place(doc, overlay, name)
     return doc

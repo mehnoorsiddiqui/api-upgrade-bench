@@ -80,6 +80,8 @@ class FakeWorld:
     def plugin_generate(self, project_dir, destination, key):
         config = json.loads((project_dir / "src" / "apimatic.json").read_text())
         assert config["languages"]["csharp"]["publishing"]["package"]["version"] == config["plugin"]["pluginVersion"]
+        # the plugin must describe the SDK at this version's tag, not the profile's moving branch
+        assert config["languages"]["csharp"]["publishing"]["source"]["branch"] == "v" + config["plugin"]["pluginVersion"]
         self.calls.append(f"plugin_generate {config['plugin']['pluginVersion']}")
         (destination / ".claude-plugin").mkdir(parents=True)
         (destination / ".claude-plugin" / "plugin.json").write_text(
@@ -99,11 +101,11 @@ def world(mini_repo, tmp_path, monkeypatch):
     ap = release_mod.apimatic
     monkeypatch.setattr(ap, "cli_version", lambda: "2.2.0")
     monkeypatch.setattr(ap, "login", lambda key: w.calls.append("login"))
-    monkeypatch.setattr(ap, "validate", lambda project_dir, key: w.calls.append("validate"))
+    monkeypatch.setattr(ap, "validate", lambda project_dir, key, fails_on="errors": w.calls.append("validate"))
     monkeypatch.setattr(ap, "sdk_publish", w.sdk_publish)
     monkeypatch.setattr(ap, "plugin_generate", w.plugin_generate)
     monkeypatch.setattr(release_mod, "has_version", lambda pkg, v: v in w.nuget)
-    monkeypatch.setattr(release_mod, "wait_for_version", lambda pkg, v, timeout_s: None)
+    monkeypatch.setattr(release_mod, "wait_for_version", lambda pkg, v, timeout_s: w.calls.append(f"wait_for_nuget {v}"))
     monkeypatch.setattr(release_mod, "create_remote_tag", w.create_remote_tag)
     monkeypatch.setattr(release_mod, "dispatch_workflow", w.dispatch_workflow)
 
@@ -139,6 +141,8 @@ def test_release_publishes_locks_and_is_idempotent(mini_repo, world):
     assert lock["2.0.0"]["plugin"]["version"] == "2.0.0"
     assert lock["2.0.0"]["publish_record"] == "published"
     assert lock["2.0.0"]["generator_drift"] is False
+    # a successful publish is enough: the run never waits for NuGet to list a version
+    assert not any(c.startswith("wait_for_nuget") for c in world.calls)
 
     world.calls.clear()
     assert release_api(Bench(mini_repo.root), "mini", ReleaseOptions()) == []
@@ -248,3 +252,9 @@ def test_nuget_published_by_the_sdk_repo_workflow(mini_repo, world):
     entry = load_lock(bench.api("mini"))["2.0.0"]
     assert entry["sdk"]["commit"] == git("rev-parse", "v2.0.0^{commit}", cwd=world.bare("owner/bench-mini-sdk-csharp"))
     assert entry["publish_record"] == "published"
+
+
+@needs_oasdiff
+def test_wait_for_nuget_is_opt_in(mini_repo, world):
+    release_api(mini_repo, "mini", ReleaseOptions(wait_for_nuget=True))
+    assert [c for c in world.calls if c.startswith("wait_for_nuget")] == ["wait_for_nuget 1.0.0", "wait_for_nuget 2.0.0"]
