@@ -1,0 +1,25 @@
+# Written by CI (`bench release`). Do not edit by hand.
+# One entry per published version: what it contains and where it was published.
+#
+# 1.0.0 is `adopted`: it was published before the bench had a publishing profile for square (SDK source
+# pushed and tagged by hand, NuGet by the SDK repo's publish-nuget.yml, plugin generated from the same
+# build); it is here so the bench never publishes this version again.
+releases:
+  1.0.0:
+    adopted: true
+    note: Base (S0, Square API 2024-04-17). The integration app's `baseline` tag pins it.
+    overlays: []
+    spec_sha256: null
+    change_types: []
+    sdk:
+      package_id: ApimaticBench.Square
+      version: 1.0.0
+      repo: mehnoorsiddiqui/bench-square-sdk-csharp
+      tag: v1.0.0
+      commit: b658d4b71b9b3f0bfb2decd1bcbe53bbae0a60ee
+    plugin:
+      repo: mehnoorsiddiqui/bench-square-context-plugin
+      tag: v1.0.0
+      commit: b57caa96717b9c89ac2b8a820844e8b9422cc752
+      version: 1.0.0
+    generator_drift: false

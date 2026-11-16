@@ -12,6 +12,14 @@ sdk_repo: mehnoorsiddiqui/bench-square-sdk-csharp
 plugin_repo: mehnoorsiddiqui/bench-square-context-plugin
 plugin_id: bench-square
 plugin_name: Bench Square
+# NuGet is published by the SDK repo's own workflow (.github/workflows/publish-nuget.yml, NuGet trusted
+# publishing), as for petstore: bench publishes the source, then dispatches that workflow with `version`.
+nuget_publisher: sdk-repo-workflow
+nuget_workflow: publish-nuget.yml
+# Files added to the SDK repo by hand, which `sdk publish --dry-run` never produces.
+drift_ignore:
+  - .github/workflows/publish-nuget.yml
+  - .github/nuget/**
 # Square's spec carries `apimatic api validate` errors the generator handles (CatalogObject is
 # recursive: a "circular reference" error; x- keys in `info`): only blocking problems fail a check.
 validate_fails_on: blocking
