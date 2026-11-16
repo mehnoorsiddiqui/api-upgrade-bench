@@ -1,0 +1,16 @@
+# Real Square API releases the benchmark steps through. Each step is one commit of api.json in
+# square/connect-api-specification; `import_square.py` fetches them, normalizes them into
+# generator inputs and writes spec/openapi.yaml (S0) plus one set of labelled overlays per step.
+#
+# square_sdk: the version of Square's own .NET SDK released for that API version (for reference;
+# 41.0.0 onward is no longer APIMatic-generated).
+source: square/connect-api-specification
+file: api.json
+steps:
+  - {id: s0, commit: aa7c41d3abb1ef93959da937cbc452245972cc18, api_version: "2024-04-17", square_sdk: 36.0.0}
+  - {id: s1, commit: a865cc0096611b78944b274eeb0015ab699a4dbf, api_version: "2024-05-15", square_sdk: 37.0.0}
+  - {id: s2, commit: c2f8282eb264d120daab5b99a07de91b75dc065e, api_version: "2024-08-21", square_sdk: 38.0.0}
+  - {id: s3, commit: 5e02fc309e448e5b8f225c43509b4f532f04a038, api_version: "2024-11-20", square_sdk: 39.0.0}
+  - {id: s4, commit: 47d5585284701495c8a99f4fdc8c613d229554e4, api_version: "2025-01-23", square_sdk: 40.0.0}
+  - {id: s5, commit: 1b6956b9f5424b10ecb44085d4d7842796e4a06a, api_version: "2025-10-16", square_sdk: 42.2.0}
+  - {id: s6, commit: 79ccc3f89e1527f7b943cc2f6628b6098572583e, api_version: "2026-09-16", square_sdk: 47.0.0}

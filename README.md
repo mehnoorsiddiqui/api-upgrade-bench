@@ -20,10 +20,12 @@ apis/<api>/
                                  bench sets plugin id/name/version and `languages` for each version
   spec/openapi.yaml              the base spec (version 1.0.0); info.title names the SDK project/namespace
   spec/APIMATIC-META.json        optional: import/merge/validation settings only (Codegen v4 ignores CodeGenSettings)
-  overlays/<change-id>.yaml      OpenAPI Overlay 1.0 + x-change {type, breaking, targets}
-  releases.yaml                  version -> [overlay ids]   (edited by hand)
+  overlays/<change-id>.yaml      OpenAPI Overlay 1.0 + x-change {type, breaking, targets, requires?}
+  releases.yaml                  version -> [overlay ids]   (edited by hand, or written by an importer)
   releases.lock.yaml             what was published         (written by CI only)
+  import/                        optional: the importer of a real API's release history (apis/square)
 tools/bench/                     the `bench` CLI (Python 3.11, uv)
+  snapshot_overlays.py           spec diff -> labelled overlays, for imported histories
 tests/                           pytest
 .github/workflows/               validate.yml (PRs), release.yml (main + manual)
 ```
@@ -31,6 +33,8 @@ tests/                           pytest
 APIs today: `petstore` (the Swagger Petstore 3.0 build used so far, renamed `ApimaticBench.Petstore`)
 and `taskboard` (an invented API, to show that adding an API is adding a folder). Petstore has one
 example overlay per change type, taskboard three; neither declares releases beyond the base yet.
+`square` is Square's real release history from 2024-04-17 to 2026-09-16, imported as described in
+[Imported histories](#imported-histories-square).
 
 ## Using it
 
@@ -95,6 +99,48 @@ unlabelled change) or when a declared type's required checks are not detected (a
 2. Do the one-time setup below, then put the profile id in `api.yaml` and merge: `1.0.0` is published.
 
 An API whose `profile_id` is still `null` is validated but never released.
+
+## Imported histories (Square)
+
+`apis/square` is not hand-written: `apis/square/import/import_square.py` builds it from seven commits
+of Square's public spec (`square/connect-api-specification`, listed in `import/snapshots.yaml`).
+
+| Version | Step | Square API | Square's own .NET SDK |
+| --- | --- | --- | --- |
+| 1.0.0 (base) | S0 | 2024-04-17 | 36.0.0 |
+| 1.1.0 | S1 | 2024-05-15 | 37.0.0 |
+| 1.2.0 | S2 | 2024-08-21 | 38.0.0 |
+| 2.0.0 | S3 | 2024-11-20 (Swagger 2.0 -> OpenAPI 3.0) | 39.0.0 |
+| 3.0.0 | S4 | 2025-01-23 | 40.0.0 |
+| 4.0.0 | S5 | 2025-10-16 | 42.2.0 |
+| 5.0.0 | S6 | 2026-09-16 | 47.0.0 |
+
+```sh
+uv run python apis/square/import/import_square.py            # fetch, normalize, write, verify
+uv run python apis/square/import/import_square.py --verify   # check the committed files only
+```
+
+1. **Normalize** each snapshot into a generator input (`import/normalize.py`; the same rules for every
+   step, so none of them shows up as a change). Codegen v4 rejects Square's Swagger 2.0 files, so
+   S0-S2 are converted to OpenAPI 3.0 the way Square converted them itself in S3; 31 dangling `$ref`s
+   in S0-S2 (and 1 in S5, 2 in S6) are resolved from later snapshots; the title is fixed to `Square`
+   (the C# namespace); `oauth2` operations use an HTTP bearer scheme (Codegen v4 turns `oauth2` into an
+   interactive authorization-code flow that cannot take an existing access token); Production and
+   Sandbox servers are declared.
+2. **Diff** each step against the previous one (`tools/bench/snapshot_overlays.py`). Every difference
+   is split into atomic edits on disjoint parts of the spec, each labelled with one catalog change type
+   (rules in the module docstring); an unknown kind of difference stops the import. Edits of one type
+   become one overlay, `overlays/s<k>-<change-type>.yaml`, with every target listed in `x-change.targets`.
+3. **Release** k lists the overlays of steps 1..k, so base + overlays rebuilds step k's spec exactly
+   (`--verify` checks this through `bench build`). A step with a breaking change type bumps the major,
+   any other step the minor.
+
+Because a later step can change what an earlier step added, an imported overlay declares
+`x-change.requires`: the previous step's overlays, plus that step's `add-model` overlay (new schemas
+come first) — `remove-model` requires the rest of its step (schemas go last). `bench validate` and
+`bench diffcheck-overlays` apply an overlay after what it requires (transitively) instead of to the bare
+base, and a release must list an overlay's requirements before it. Change types oasdiff cannot see
+(documentation, release status, an unreferenced new schema) have `required: []` in the catalog.
 
 ## One-time setup
 
