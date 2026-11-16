@@ -1,0 +1,24 @@
+# Written by CI (`bench release`). Do not edit by hand.
+# One entry per published version: what it contains and where it was published.
+releases:
+  1.0.0:
+    overlays: []
+    spec_sha256: cc8581b1228d7bc1e8ffaa482320f5a24d21dd94273b04c8ac18f79044c22058
+    change_types: []
+    oasdiff_checks: []
+    cli_version: 2.2.0
+    sdk:
+      package_id: ApimaticBench.Petstore
+      version: 1.0.0
+      repo: mehnoorsiddiqui/apimatic-bench-petstore-dotnet-sdk
+      tag: v1.0.0
+      commit: 1763e04f8a0fdc774fa66adc6fc449681a46b0d2
+    plugin:
+      repo: mehnoorsiddiqui/bench-petstore-context-plugin
+      tag: v1.0.0
+      commit: b10b61b9185521b7cab1ea90d61cc17235c40399
+      version: 1.0.0
+    generator_drift: false
+    publish_record: published
+    published_at: '2026-11-16T10:53:06Z'
+    workflow_run_url: https://github.com/mehnoorsiddiqui/api-upgrade-bench/actions/runs/43852534548
