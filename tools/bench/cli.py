@@ -104,6 +104,7 @@ def cmd_release(bench: Bench, args) -> int:
         commit_lock=args.commit_lock,
         push_lock=not args.no_push,
         dry_run=args.dry_run,
+        wait_for_nuget=args.wait_for_nuget,
         nuget_timeout_s=args.nuget_timeout * 60,
     )
     release_api(bench, args.api, opts)
@@ -184,7 +185,9 @@ def main(argv: list[str] | None = None) -> int:
     p.add_argument("--commit-lock", action="store_true", help="commit releases.lock.yaml after each version")
     p.add_argument("--no-push", action="store_true", help="with --commit-lock: commit but do not push")
     p.add_argument("--dry-run", action="store_true", help="build, check and generate; publish nothing")
-    p.add_argument("--nuget-timeout", type=int, default=30, help="minutes to wait for NuGet (default 30)")
+    p.add_argument("--wait-for-nuget", action="store_true",
+                   help="after publishing, wait until NuGet lists the version (off: publishing is enough)")
+    p.add_argument("--nuget-timeout", type=int, default=30, help="minutes to wait with --wait-for-nuget (default 30)")
     p.set_defaults(func=cmd_release)
 
     p = sub.add_parser("nuget-wait", help="wait until NuGet lists a package version")

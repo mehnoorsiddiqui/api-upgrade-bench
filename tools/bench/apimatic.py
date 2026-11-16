@@ -129,6 +129,20 @@ def write_publish_record(project_dir: Path, record: dict) -> None:
     _config_path(project_dir).write_text(json.dumps(config, indent=2) + "\n", encoding="utf-8", newline="\n")
 
 
+def pin_source_ref(project_dir: Path, ref: str) -> None:
+    """Point the publishing record's source at `ref` (the version's tag) instead of the profile's branch.
+
+    `plugin generate` tells agents to read the SDK source (and its SDK map) at the recorded branch. The
+    profile records its branch, which moves on with every later release, so a plugin for 1.1.0 would
+    describe whatever the branch holds by then. `git clone --branch` takes a tag too, so the tag pins it.
+    """
+    record = publish_record(project_dir)
+    if not record:
+        raise BenchError(f"{_config_path(project_dir)} has no languages.csharp.publishing record to pin")
+    record.setdefault("source", {})["branch"] = ref
+    write_publish_record(project_dir, record)
+
+
 def reconstructed_record(sdk_repo: str, branch: str, package_id: str, version: str) -> dict:
     return {
         "source": {"repositoryUrl": f"https://github.com/{sdk_repo}", "branch": branch},

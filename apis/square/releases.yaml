@@ -4,7 +4,7 @@
 # Each release is one real Square API version: the base (S0, Square API 2024-04-17) plus the overlays
 # of every step up to it, so it rebuilds that version's spec exactly. A step's overlays each carry one change
 # type and require the previous step's overlays. A step with a breaking change type bumps the major.
-base: 1.0.0
+base: 1.0.1
 releases:
 - version: 1.1.0
   overlays:

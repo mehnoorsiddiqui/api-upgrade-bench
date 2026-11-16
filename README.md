@@ -107,7 +107,7 @@ of Square's public spec (`square/connect-api-specification`, listed in `import/s
 
 | Version | Step | Square API | Square's own .NET SDK |
 | --- | --- | --- | --- |
-| 1.0.0 (base) | S0 | 2024-04-17 | 36.0.0 |
+| 1.0.1 (base) | S0 | 2024-04-17 | 36.0.0 |
 | 1.1.0 | S1 | 2024-05-15 | 37.0.0 |
 | 1.2.0 | S2 | 2024-08-21 | 38.0.0 |
 | 2.0.0 | S3 | 2024-11-20 (Swagger 2.0 -> OpenAPI 3.0) | 39.0.0 |
@@ -133,7 +133,14 @@ uv run python apis/square/import/import_square.py --verify   # check the committ
    become one overlay, `overlays/s<k>-<change-type>.yaml`, with every target listed in `x-change.targets`.
 3. **Release** k lists the overlays of steps 1..k, so base + overlays rebuilds step k's spec exactly
    (`--verify` checks this through `bench build`). A step with a breaking change type bumps the major,
-   any other step the minor.
+   any other step the minor. Patch versions are left for re-publishing a step itself.
+
+Every version — the base included — is published by the `square-api` profile (source and NuGet
+`ApimaticBench.Square`), and its context plugin carries the same version and points at the SDK's
+`v<version>` tag. The base is `1.0.1`: `1.0.0` was the same S0 spec published by hand before the
+profile existed (NuGet through a workflow in the SDK repo, assembly `Square.dll` where the profile
+builds `ApimaticBench.Square.dll`); it stays on nuget.org and in the lock as adopted history, since
+nuget.org versions cannot be deleted.
 
 Because a later step can change what an earlier step added, an imported overlay declares
 `x-change.requires`: the previous step's overlays, plus that step's `add-model` overlay (new schemas
@@ -159,7 +166,7 @@ For the repo (once):
   NuGet and SDK-repo GitHub credentials stay inside the APIMatic publishing profile.
 - An API with `nuget_publisher: sdk-repo-workflow` (petstore, for now) leaves NuGet to a workflow in
   its SDK repo: APIMatic publishes the source only, then bench runs that workflow with
-  `-f version=<version>`, waits for NuGet and takes the tag the workflow creates. The PAT then also
+  `-f version=<version>` and waits for the tag the workflow creates after its NuGet push. The PAT then also
   needs **Actions: read and write** on that SDK repo, and the workflow must not also run on `push`
   (otherwise APIMatic's push publishes a second, auto-numbered version).
 - `release.yml` commits `releases.lock.yaml` to `main` with `GITHUB_TOKEN`; if `main` is protected,
@@ -178,9 +185,12 @@ For each version declared but not in the lock, serially (`concurrency: release-<
 4. `apimatic sdk publish --publish-type package --publish-type sourcecode` into a fresh, empty SDK dir
    (nothing to merge: pure generator output)
 5. check `languages.csharp.publishing` in `src/apimatic.json` (version, repo, package id), tag
-   `v<version>` in the SDK repo (created on the published commit if APIMatic did not), wait for NuGet
+   `v<version>` in the SDK repo (created on the published commit if APIMatic did not). The run does not
+   wait for NuGet to list the version (a successful publish already pushed it; indexing takes minutes);
+   `bench release --wait-for-nuget` waits when something after the release must restore it at once
 6. `apimatic plugin generate`; the `plugin` block in `apimatic.json` is written by `bench build`, so
-   it runs without a terminal, with `pluginVersion` = the SDK version
+   it runs without a terminal, with `pluginVersion` = the SDK version; the publishing record's source
+   branch is replaced by the tag `v<version>`, so the plugin describes the SDK at that version
 7. push the plugin repo (contents replaced, `.claude-plugin/plugin.json` version checked), commit
    `Publish <plugin_id> <version>`, annotated tag `v<version>`
 8. append the lock entry and commit it (`[skip ci]`)

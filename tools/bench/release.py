@@ -49,6 +49,10 @@ class ReleaseOptions:
     commit_lock: bool = False
     push_lock: bool = True
     dry_run: bool = False
+    # Off by default: a successful publish already put the package on nuget.org, and nothing later in
+    # the release needs it to be listed (indexing takes minutes per version). Turn it on when whatever
+    # runs after the release must restore the package straight away.
+    wait_for_nuget: bool = False
     nuget_timeout_s: int = 1800
 
 
@@ -80,7 +84,7 @@ def _same_repo(url: str | None, repo: str) -> bool:
 
 
 def _publish_sdk(
-    api: Api, b: BuildResult, profile_id: str, token: str | None, nuget_timeout_s: int
+    api: Api, b: BuildResult, profile_id: str, token: str | None, nuget_timeout_s: int, wait_for_nuget: bool = False
 ) -> tuple[dict, str]:
     """Publish (or recognise an earlier publish of) the SDK. Returns (sdk lock entry, publish_record kind)."""
     version, tag = b.version, f"v{b.version}"
@@ -134,8 +138,7 @@ def _publish_sdk(
         if by_workflow:
             # The workflow builds the commit APIMatic just pushed, publishes `version`, then tags it.
             dispatch_workflow(api.sdk_repo, api.nuget_workflow, api.sdk_branch, {"version": version}, token)
-            wait_for_version(api.nuget_package_id, version, timeout_s=nuget_timeout_s)
-            on_nuget = True
+            # the workflow tags only after its NuGet push succeeded, so the tag is the proof it published
             sdk_commit = wait_for_tag(api.sdk_repo, tag, token, timeout_s=600)
         else:
             sdk_commit = remote_tag_commit(api.sdk_repo, tag, token)
@@ -148,7 +151,7 @@ def _publish_sdk(
             create_remote_tag(api.sdk_repo, tag, head, token)
             sdk_commit = head
 
-    if not on_nuget:
+    if wait_for_nuget and not on_nuget:
         wait_for_version(api.nuget_package_id, version, timeout_s=nuget_timeout_s)
 
     return {
@@ -168,6 +171,8 @@ def _publish_plugin(api: Api, b: BuildResult, key: str, token: str | None) -> di
         commit = existing
     else:
         plugin_dir = b.project_dir / "plugin"
+        # the SDK is tagged by now: make the plugin describe that tag, not the profile's moving branch
+        apimatic.pin_source_ref(b.project_dir, tag)
         apimatic.plugin_generate(b.project_dir, plugin_dir, key)
         pushed = push_plugin(
             plugin_dir,
@@ -200,7 +205,7 @@ def release_version(
         print(f"dry run: {api.name} {version} built, checked and generated; nothing published", flush=True)
         return
 
-    sdk, record_kind = _publish_sdk(api, b, api.profile_id, token, opts.nuget_timeout_s)
+    sdk, record_kind = _publish_sdk(api, b, api.profile_id, token, opts.nuget_timeout_s, opts.wait_for_nuget)
     plugin = _publish_plugin(api, b, key, token)
 
     entry = make_entry(
