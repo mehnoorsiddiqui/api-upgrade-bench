@@ -111,6 +111,19 @@ def dispatch_workflow(repo: str, workflow: str, ref: str, inputs: dict[str, str]
     run(args, env={"GH_TOKEN": token} if token else None, capture=True)
 
 
+def version_tag(repo: str, version: str, token: str | None = None) -> tuple[str | None, str | None]:
+    """The SDK repo's tag for `version` and the commit it points at, or (None, None).
+
+    Two names count: `v<version>`, which the bench creates, and `<version>`, which an APIMatic source
+    publish creates. Accepting both keeps a version from being republished, or tagged twice, because
+    of how its tag is spelled."""
+    for tag in (f"v{version}", version):
+        commit = remote_tag_commit(repo, tag, token)
+        if commit:
+            return tag, commit
+    return None, None
+
+
 def wait_for_tag(repo: str, tag: str, token: str | None, timeout_s: int = 600, interval_s: int = 15) -> str | None:
     """The tag's commit once it exists, or None after the timeout."""
     deadline = time.monotonic() + timeout_s

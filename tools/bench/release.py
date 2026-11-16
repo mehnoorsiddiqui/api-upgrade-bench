@@ -39,6 +39,7 @@ from .proc import (
     remote_branch_commit,
     remote_tag_commit,
     run,
+    version_tag,
     wait_for_tag,
 )
 from .validate import require_valid
@@ -85,18 +86,41 @@ def _same_repo(url: str | None, repo: str) -> bool:
     return url.lower().removesuffix(".git").rstrip("/").endswith("/" + repo.lower())
 
 
+def _check_publish_record(api: Api, record: dict, version: str) -> None:
+    """The publishing record `sdk publish` wrote must describe this version, repo and package."""
+    published_version = (record.get("package") or {}).get("version")
+    if published_version != version:
+        raise BenchError(
+            f"after sdk publish, src/apimatic.json records package version {published_version!r}, expected {version!r}"
+        )
+    source_url = (record.get("source") or {}).get("repositoryUrl")
+    if not _same_repo(source_url, api.sdk_repo):
+        raise BenchError(
+            f"the publishing profile pushed the source to {source_url!r}, but api.yaml says sdk_repo is {api.sdk_repo!r}"
+        )
+    package_id = (record.get("packageConfiguration") or {}).get("packageId")
+    if package_id and package_id.lower() != api.nuget_package_id.lower():
+        raise BenchError(
+            f"the publishing profile published package {package_id!r}, but api.yaml says {api.nuget_package_id!r}"
+        )
+
+
 def _publish_sdk(
     api: Api, b: BuildResult, profile_id: str, token: str | None, nuget_timeout_s: int, wait_for_nuget: bool = False
 ) -> tuple[dict, str]:
     """Publish (or recognise an earlier publish of) the SDK. Returns (sdk lock entry, publish_record kind)."""
-    version, tag = b.version, f"v{b.version}"
+    version = b.version
     sdk_dir = b.project_dir / "sdk" / "csharp"
     on_nuget = has_version(api.nuget_package_id, version)
-    sdk_commit = remote_tag_commit(api.sdk_repo, tag, token)
+    # `v<version>` (the bench's tag) or `<version>` (the tag an APIMatic source publish creates)
+    tag, sdk_commit = version_tag(api.sdk_repo, version, token)
+    by_workflow = api.nuget_publisher == "sdk-repo-workflow"
 
-    if sdk_commit:
+    if sdk_commit and (on_nuget or by_workflow):
+        # With the SDK repo's workflow, the tag itself proves the package was pushed: the workflow tags
+        # only after its NuGet push succeeded (NuGet may simply not list it yet).
         print(
-            f"SDK {version} was already published (NuGet: {'yes' if on_nuget else 'no'}, "
+            f"SDK {version} was already published (NuGet: {'yes' if on_nuget else 'pushed by the workflow'}, "
             f"{api.sdk_repo}@{tag}: yes); not publishing again",
             flush=True,
         )
@@ -104,14 +128,30 @@ def _publish_sdk(
             b.project_dir, apimatic.reconstructed_record(api.sdk_repo, api.sdk_branch, api.nuget_package_id, version)
         )
         record_kind = "reconstructed"
+    elif sdk_commit:
+        # Tagged but not on NuGet: an earlier publish got the source out but not the package (APIMatic
+        # reports the two targets separately, e.g. Source Code: Published, Package: Failed). Publish the
+        # package only: the source is in place, and re-pushing it would collide with its tag.
+        print(
+            f"{api.sdk_repo}@{tag} exists but {api.nuget_package_id} {version} is not on NuGet: "
+            "publishing the package only",
+            flush=True,
+        )
+        apimatic.sdk_publish(b.project_dir, sdk_dir, profile_id, version, publish_types=("package",))
+        record = apimatic.publish_record(b.project_dir) or {}
+        # a package-only publish may record no source: point the plugin at the source already published
+        record.setdefault("source", {"repositoryUrl": f"https://github.com/{api.sdk_repo}", "branch": api.sdk_branch})
+        apimatic.write_publish_record(b.project_dir, record)
+        _check_publish_record(api, record, version)
+        on_nuget = True
+        record_kind = "published"
     else:
-        by_workflow = api.nuget_publisher == "sdk-repo-workflow"
         # On NuGet but no tag: an earlier publish got the package out but not the source (APIMatic
         # reports the two targets separately). NuGet versions are permanent, so publish the source only.
         source_only = on_nuget or by_workflow
         if on_nuget:
             print(
-                f"{api.nuget_package_id} {version} is already on NuGet but {api.sdk_repo} has no {tag}: "
+                f"{api.nuget_package_id} {version} is already on NuGet but {api.sdk_repo} has no v{version} tag: "
                 "publishing the source code only",
                 flush=True,
             )
@@ -125,30 +165,18 @@ def _publish_sdk(
             record.setdefault("packageConfiguration", {}).setdefault("packageId", api.nuget_package_id)
             record["package"] = {"version": version}
             apimatic.write_publish_record(b.project_dir, record)
-        published_version = (record.get("package") or {}).get("version")
-        if published_version != version:
-            raise BenchError(
-                f"after sdk publish, src/apimatic.json records package version {published_version!r}, expected {version!r}"
-            )
-        source_url = (record.get("source") or {}).get("repositoryUrl")
-        if not _same_repo(source_url, api.sdk_repo):
-            raise BenchError(
-                f"the publishing profile pushed the source to {source_url!r}, but api.yaml says sdk_repo is {api.sdk_repo!r}"
-            )
-        package_id = (record.get("packageConfiguration") or {}).get("packageId")
-        if package_id and package_id.lower() != api.nuget_package_id.lower():
-            raise BenchError(
-                f"the publishing profile published package {package_id!r}, but api.yaml says {api.nuget_package_id!r}"
-            )
+        _check_publish_record(api, record, version)
         record_kind = "published"
         if by_workflow and not on_nuget:
             # The workflow builds the commit APIMatic just pushed, publishes `version`, then tags it.
             dispatch_workflow(api.sdk_repo, api.nuget_workflow, api.sdk_branch, {"version": version}, token)
             # the workflow tags only after its NuGet push succeeded, so the tag is the proof it published
+            tag = f"v{version}"
             sdk_commit = wait_for_tag(api.sdk_repo, tag, token, timeout_s=600)
         else:
-            sdk_commit = remote_tag_commit(api.sdk_repo, tag, token)
+            tag, sdk_commit = version_tag(api.sdk_repo, version, token)
         if not sdk_commit:
+            tag = f"v{version}"
             branch = (record.get("source") or {}).get("branch") or api.sdk_branch
             head = remote_branch_commit(api.sdk_repo, branch, token)
             if not head:
@@ -169,7 +197,7 @@ def _publish_sdk(
     }, record_kind
 
 
-def _publish_plugin(api: Api, b: BuildResult, key: str, token: str | None) -> dict:
+def _publish_plugin(api: Api, b: BuildResult, key: str, token: str | None, sdk_tag: str) -> dict:
     version, tag = b.version, f"v{b.version}"
     existing = remote_tag_commit(api.plugin_repo, tag, token)
     if existing:
@@ -178,7 +206,7 @@ def _publish_plugin(api: Api, b: BuildResult, key: str, token: str | None) -> di
     else:
         plugin_dir = b.project_dir / "plugin"
         # the SDK is tagged by now: make the plugin describe that tag, not the profile's moving branch
-        apimatic.pin_source_ref(b.project_dir, tag)
+        apimatic.pin_source_ref(b.project_dir, sdk_tag)
         apimatic.plugin_generate(b.project_dir, plugin_dir, key)
         pushed = push_plugin(
             plugin_dir,
@@ -212,7 +240,7 @@ def release_version(
         return
 
     sdk, record_kind = _publish_sdk(api, b, api.profile_id, token, opts.nuget_timeout_s, opts.wait_for_nuget)
-    plugin = _publish_plugin(api, b, key, token)
+    plugin = _publish_plugin(api, b, key, token, sdk["tag"])
 
     entry = make_entry(
         overlays=list(b.overlays),

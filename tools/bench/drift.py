@@ -17,7 +17,7 @@ from pathlib import Path
 from . import apimatic
 from .build import build
 from .config import Api, Bench
-from .proc import remote_tag_commit, repo_url, run
+from .proc import repo_url, run, version_tag
 
 # .git, and the CLI's own bookkeeping (.apimatic/generation.json etc.), which a dry run writes into
 # the SDK dir but `sdk publish` never uploads.
@@ -63,9 +63,9 @@ def compare_trees(generated: Path, published: Path, ignore: tuple[str, ...] = ()
 
 def check_drift(bench: Bench, api: Api, *, profile_id: str, token: str | None) -> DriftResult:
     base = bench.releases(api).base
-    tag = f"v{base}"
-    if not remote_tag_commit(api.sdk_repo, tag, token):
-        print(f"drift: {api.sdk_repo} has no {tag} yet; nothing to compare against", flush=True)
+    tag, _ = version_tag(api.sdk_repo, base, token)
+    if not tag:
+        print(f"drift: {api.sdk_repo} has no v{base} (or {base}) yet; nothing to compare against", flush=True)
         return DriftResult(checked=False)
 
     project = build(bench, api.name, base, project_dir=bench.build_dir / api.name / "_drift" / base)

@@ -196,6 +196,10 @@ For each version declared but not in the lock, serially (`concurrency: release-<
 Idempotent: a locked version is skipped, and within a version a step whose result exists (NuGet
 version, SDK tag, plugin tag) is not repeated. When the SDK was published by an earlier, interrupted
 run, its publishing record is reconstructed from `api.yaml` (`publish_record: reconstructed` in the lock).
+APIMatic reports the source and the package separately, so a run can stop with only one of them out:
+on NuGet but untagged, the re-run publishes the source only; tagged but not on NuGet, the package only.
+An SDK tag counts whether it is `v<version>` (the bench's) or `<version>` (the one an APIMatic source
+publish creates).
 
 Lock entry (`releases.lock.yaml`):
 

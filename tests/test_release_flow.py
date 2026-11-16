@@ -32,6 +32,10 @@ class FakeWorld:
         self.calls: list[str] = []
         self.fail_plugin_push_once = False
         self.publish_types: list[tuple] = []
+        # like the real APIMatic: tag the published source `<version>` (no `v`)
+        self.apimatic_tags_source = False
+        # like the run of square 1.0.1: Source Code: Published, Package: Failed
+        self.fail_package_once = False
 
     def dispatch_workflow(self, repo, workflow, ref, inputs, token):
         """The SDK repo's NuGet workflow: publishes inputs['version'] and tags the branch head."""
@@ -57,14 +61,23 @@ class FakeWorld:
             (destination / name).write_text(text)
         if dry_run:
             return
-        work = project_dir / "_sdkpush"
-        git("clone", "--quiet", self.bare("owner/bench-mini-sdk-csharp").as_uri(), str(work))
-        git("checkout", "-B", "main", cwd=work)
-        for name in self.generated_files(project_dir, version):
-            shutil.copy(destination / name, work / name)
-        git("add", "-A", cwd=work)
-        git("-c", "user.name=t", "-c", "user.email=t@t", "commit", "-qm", f"v{version}", cwd=work)
-        git("push", "-q", "origin", "main", cwd=work)  # APIMatic does not tag here: exercises the fallback
+        if "sourcecode" in publish_types:
+            work = project_dir / "_sdkpush"
+            shutil.rmtree(work, ignore_errors=True)
+            git("clone", "--quiet", self.bare("owner/bench-mini-sdk-csharp").as_uri(), str(work))
+            git("checkout", "-B", "main", cwd=work)
+            for name in self.generated_files(project_dir, version):
+                shutil.copy(destination / name, work / name)
+            git("add", "-A", cwd=work)
+            git("-c", "user.name=t", "-c", "user.email=t@t", "commit", "-qm", f"v{version}", cwd=work)
+            git("push", "-q", "origin", "main", cwd=work)  # by default no tag here: exercises the fallback
+            if self.apimatic_tags_source:
+                if version in git("tag", "--list", cwd=self.bare("owner/bench-mini-sdk-csharp")).split():
+                    raise BenchError(f"sdk publish: tag {version} already exists")  # pushing the source twice
+                git("tag", version, "main", cwd=self.bare("owner/bench-mini-sdk-csharp"))
+        if "package" in publish_types and self.fail_package_once:
+            self.fail_package_once = False
+            raise BenchError("sdk publish: Source Code: Published | Package: Failed")
         record = {
             "source": {"repositoryUrl": "https://github.com/owner/bench-mini-sdk-csharp", "branch": "main"},
             "packageConfiguration": {"packageId": "ApimaticBench.Mini"},
@@ -81,7 +94,8 @@ class FakeWorld:
         config = json.loads((project_dir / "src" / "apimatic.json").read_text())
         assert config["languages"]["csharp"]["publishing"]["package"]["version"] == config["plugin"]["pluginVersion"]
         # the plugin must describe the SDK at this version's tag, not the profile's moving branch
-        assert config["languages"]["csharp"]["publishing"]["source"]["branch"] == "v" + config["plugin"]["pluginVersion"]
+        version = config["plugin"]["pluginVersion"]
+        assert config["languages"]["csharp"]["publishing"]["source"]["branch"] in ("v" + version, version)
         self.calls.append(f"plugin_generate {config['plugin']['pluginVersion']}")
         (destination / ".claude-plugin").mkdir(parents=True)
         (destination / ".claude-plugin" / "plugin.json").write_text(
@@ -258,3 +272,39 @@ def test_nuget_published_by_the_sdk_repo_workflow(mini_repo, world):
 def test_wait_for_nuget_is_opt_in(mini_repo, world):
     release_api(mini_repo, "mini", ReleaseOptions(wait_for_nuget=True))
     assert [c for c in world.calls if c.startswith("wait_for_nuget")] == ["wait_for_nuget 1.0.0", "wait_for_nuget 2.0.0"]
+
+
+@needs_oasdiff
+def test_source_published_but_package_failed_publishes_package_only(mini_repo, world):
+    world.apimatic_tags_source = True
+    world.fail_package_once = True
+    with pytest.raises(BenchError, match="Package: Failed"):
+        release_api(mini_repo, "mini", ReleaseOptions())
+    sdk_repo = "owner/bench-mini-sdk-csharp"
+    assert tags(world, sdk_repo) == ["1.0.0"] and world.nuget == set()  # source out, package not
+    assert load_lock(mini_repo.api("mini")) == {}
+
+    world.calls.clear()
+    world.publish_types.clear()
+    assert release_api(Bench(mini_repo.root), "mini", ReleaseOptions()) == ["1.0.0", "2.0.0"]
+    publishes = list(zip([c for c in world.calls if c.startswith("sdk_publish")], world.publish_types))
+    assert ("sdk_publish 1.0.0 dry", ("package", "sourcecode")) in publishes  # drift check found the `1.0.0` tag
+    assert [t for c, t in publishes if c == "sdk_publish 1.0.0"] == [("package",)]  # the source is not pushed again
+    assert [t for c, t in publishes if c == "sdk_publish 2.0.0"] == [("package", "sourcecode")]
+    assert world.nuget == {"1.0.0", "2.0.0"}
+    assert tags(world, sdk_repo) == ["1.0.0", "2.0.0"]  # APIMatic's tags are used, no second `v` tag
+    entry = load_lock(mini_repo.api("mini"))["1.0.0"]
+    assert entry["publish_record"] == "published"
+    assert entry["sdk"]["tag"] == "1.0.0"
+    assert entry["sdk"]["commit"] == git("rev-parse", "1.0.0^{commit}", cwd=world.bare(sdk_repo))
+    assert "plugin_generate 1.0.0" in world.calls
+    assert tags(world, "owner/bench-mini-context-plugin") == ["v1.0.0", "v2.0.0"]
+
+
+@needs_oasdiff
+def test_drift_check_finds_an_unprefixed_base_tag(mini_repo, world):
+    world.apimatic_tags_source = True
+    release_api(mini_repo, "mini", ReleaseOptions(version="1.0.0"))
+    world.calls.clear()
+    release_api(Bench(mini_repo.root), "mini", ReleaseOptions())
+    assert "sdk_publish 1.0.0 dry" in world.calls  # compared against the `1.0.0` tag
