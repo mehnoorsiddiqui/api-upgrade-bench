@@ -67,3 +67,46 @@ releases:
     publish_record: published
     published_at: '2026-11-16T17:18:06Z'
     workflow_run_url: https://github.com/mehnoorsiddiqui/api-upgrade-bench/actions/runs/43915832035
+  1.2.0:
+    overlays:
+    - s1-add-optional-property
+    - s1-docs-and-metadata
+    - s2-add-model
+    - s2-add-endpoint
+    - s2-add-optional-parameter
+    - s2-add-optional-property
+    - s2-docs-and-metadata
+    - s2-property-became-writable
+    - s2-release-status-change
+    spec_sha256: d1f3f1c70f26820d96dacd86922b7845c120387d48b62b0ce4242e939ab85e4e
+    change_types:
+    - add-optional-property
+    - docs-and-metadata
+    - add-model
+    - add-endpoint
+    - add-optional-parameter
+    - property-became-writable
+    - release-status-change
+    oasdiff_checks:
+    - endpoint-added
+    - new-optional-request-parameter
+    - new-optional-request-property
+    - request-optional-property-became-not-read-only
+    - response-optional-property-added
+    - response-optional-property-became-not-read-only
+    cli_version: 2.2.0
+    sdk:
+      package_id: ApimaticBench.Square
+      version: 1.2.0
+      repo: mehnoorsiddiqui/bench-square-sdk-csharp
+      tag: 1.2.0
+      commit: ae0ffe09e696f21cadf5bdb287a7b2a4a4c4989d
+    plugin:
+      repo: mehnoorsiddiqui/bench-square-context-plugin
+      tag: v1.2.0
+      commit: 649517454c854be959a9f2755281a7d0e6c662cd
+      version: 1.2.0
+    generator_drift: false
+    publish_record: published
+    published_at: '2026-11-17T08:10:20Z'
+    workflow_run_url: https://github.com/mehnoorsiddiqui/api-upgrade-bench/actions/runs/44043636053
