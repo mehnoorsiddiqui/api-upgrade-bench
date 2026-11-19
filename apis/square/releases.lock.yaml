@@ -197,3 +197,103 @@ releases:
     publish_record: published
     published_at: '2026-11-17T08:22:22Z'
     workflow_run_url: https://github.com/mehnoorsiddiqui/api-upgrade-bench/actions/runs/44045522862
+  3.0.0:
+    overlays:
+    - s1-add-optional-property
+    - s1-docs-and-metadata
+    - s2-add-model
+    - s2-add-endpoint
+    - s2-add-optional-parameter
+    - s2-add-optional-property
+    - s2-docs-and-metadata
+    - s2-property-became-writable
+    - s2-release-status-change
+    - s3-add-model
+    - s3-add-endpoint
+    - s3-add-enum-value
+    - s3-add-optional-property
+    - s3-auth-scheme-change
+    - s3-became-enum
+    - s3-change-constraint
+    - s3-change-property-model
+    - s3-deprecate-endpoint
+    - s3-docs-and-metadata
+    - s3-nullability-change
+    - s3-property-became-optional
+    - s3-property-became-required
+    - s4-add-model
+    - s4-add-endpoint
+    - s4-add-enum-value
+    - s4-add-optional-parameter
+    - s4-add-optional-property
+    - s4-change-constraint
+    - s4-docs-and-metadata
+    - s4-nullability-change
+    - s4-property-became-optional
+    - s4-remove-property
+    spec_sha256: 2c4e27fe8ff57a24965be9b8415b4daa5e3fedeae3bd786c6e9e7ae8ca27405e
+    change_types:
+    - add-optional-property
+    - docs-and-metadata
+    - add-model
+    - add-endpoint
+    - add-optional-parameter
+    - property-became-writable
+    - release-status-change
+    - add-enum-value
+    - auth-scheme-change
+    - became-enum
+    - change-constraint
+    - change-property-model
+    - deprecate-endpoint
+    - nullability-change
+    - property-became-optional
+    - property-became-required
+    - remove-property
+    oasdiff_checks:
+    - api-security-added
+    - api-security-removed
+    - endpoint-added
+    - endpoint-deprecated
+    - new-optional-request-parameter
+    - new-optional-request-property
+    - request-optional-property-became-not-read-only
+    - request-parameter-became-enum
+    - request-parameter-default-value-added
+    - request-property-became-enum
+    - request-property-became-nullable
+    - request-property-became-optional
+    - request-property-max-length-set
+    - request-property-max-length-unset
+    - request-property-max-unset
+    - request-property-min-length-unset
+    - request-property-min-unset
+    - request-property-removed
+    - response-optional-property-added
+    - response-optional-property-became-not-read-only
+    - response-optional-property-removed
+    - response-property-became-enum
+    - response-property-became-nullable
+    - response-property-became-optional
+    - response-property-max-length-set
+    - response-property-max-length-unset
+    - response-property-max-unset
+    - response-property-min-length-unset
+    - response-property-min-unset
+    - response-required-property-became-not-read-only
+    cli_version: 2.2.0
+    sdk:
+      package_id: ApimaticBench.Square
+      version: 3.0.0
+      repo: mehnoorsiddiqui/bench-square-sdk-csharp
+      tag: 3.0.0
+      commit: ee8ff884b389cad29fe64ba18331bc55fafa53cf
+    plugin:
+      repo: mehnoorsiddiqui/bench-square-context-plugin
+      tag: v3.0.0
+      commit: e8ecef908e99e7cb0f9d0b92ba982b2d8f7c1d58
+      version: 3.0.0
+    generator_drift: false
+    publish_record: published
+    published_at: '2026-11-19T10:10:26Z'
+    workflow_run_url: https://github.com/mehnoorsiddiqui/api-upgrade-bench/actions/runs/44501912692
